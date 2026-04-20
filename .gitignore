@@ -1,0 +1,30 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# CLI-generated outputs
+out/
+out-*/
+
+# Item textures are fetched by scripts/fetch-textures.ps1, not checked in
+items/
+
+# Logs and OS / editor noise
+*.log
+.DS_Store
+Thumbs.db
+.vscode/*.log
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# npm / pnpm / yarn debug output
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
