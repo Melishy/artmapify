@@ -1,0 +1,55 @@
+name: Bug report
+description: Something in the CLI or the generated output is wrong.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. The more concrete info you
+        give, the faster it can be fixed.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you see instead?
+      placeholder: |
+        I ran `npx tsx src/cli.ts myart.png --width 3 --height 3 --guide`
+        and expected a 3x3 canvas, but got ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact command(s), and any relevant flags. If a specific input image is needed, mention its size and format.
+      placeholder: |
+        1. `npx tsx src/cli.ts photo.jpg --dither floyd-steinberg --click-bias 12 --guide`
+        2. Open `out/preview.png`
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+      placeholder: "20.11.1"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Windows 11 / macOS 14 / Ubuntu 22.04"
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary-json
+    attributes:
+      label: summary.json (optional)
+      description: If the bug is about output, paste the `inputHash`, `argsHash`, and `args` block from `out/summary.json`. This pins down exactly what produced the result.
+      render: json

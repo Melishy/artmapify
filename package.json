@@ -1,0 +1,30 @@
+{
+  "name": "artmapify",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Convert images to Minecraft ArtMap dye canvases.",
+  "license": "MIT",
+  "author": "melishy",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "artmapify": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "dev": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "fetch-textures": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-textures.ps1"
+  },
+  "dependencies": {
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}
