@@ -9,13 +9,13 @@ Convert an image into a grid of Minecraft maps you can paint in-game using the [
 
 ## Requirements
 
-- Node.js 18+ (ES2022, ESM).
+- Node.js 20+ (ES2022, ESM, global `fetch`).
 - npm (or pnpm/yarn).
-- On Windows, PowerShell 7+ (`pwsh`) is used by the texture fetcher. You can skip that step if you don't want per-cell textures on the guides.
+- Works on Windows, macOS, and Linux.
 
 ## Install
 
-```powershell
+```bash
 npm install
 ```
 
@@ -23,7 +23,7 @@ npm install
 
 The per-tile guide images draw the actual Minecraft item texture inside each cell. Textures are not shipped with this repo. Run:
 
-```powershell
+```bash
 npm run fetch-textures
 ```
 
@@ -31,7 +31,7 @@ This populates the `items/` folder. If the folder is empty or missing, guides st
 
 ## Quick start
 
-```powershell
+```bash
 npx tsx src/cli.ts myart.png --width 5 --height 5 --dither floyd-steinberg --guide --combined
 ```
 
@@ -120,37 +120,37 @@ Only relevant when you pass `--guide` or `--combined`.
 
 Plain 4x4 preview only:
 
-```powershell
+```bash
 npx tsx src/cli.ts myart.png
 ```
 
 5x5 with dithering, full guides, and stitched canvas:
 
-```powershell
+```bash
 npx tsx src/cli.ts myart.png --width 5 --height 5 --dither floyd-steinberg --guide --combined
 ```
 
 Big, readable per-tile guides (good for printing or a second monitor):
 
-```powershell
+```bash
 npx tsx src/cli.ts myart.png --width 3 --height 3 --guide --cell-size 48 --ruler-margin 32
 ```
 
 Grayscale portrait, higher contrast:
 
-```powershell
+```bash
 npx tsx src/cli.ts photo.jpg --filter grayscale --contrast 1.2 --guide
 ```
 
 Match the input's aspect ratio with a 12-tile budget, cover-crop, and bias toward cheap dye shades:
 
-```powershell
+```bash
 npx tsx src/cli.ts photo.jpg --width 4 --height 3 --aspect auto --fit cover --click-bias 12 --guide
 ```
 
 Photo-friendly dither (linear-light error diffusion) with a full guide:
 
-```powershell
+```bash
 npx tsx src/cli.ts photo.jpg --width 5 --height 5 --dither floyd-steinberg --gamma-dither --guide --combined
 ```
 
@@ -169,7 +169,7 @@ src/
   image.ts           Load, resize, adjust, dither, quantize.
   render.ts          Preview and guide image rendering.
 scripts/
-  fetch-textures.ps1 Downloads item textures.
+  fetch-textures.mjs Downloads item textures.
   gen-palette.mjs    Regenerates palette.csv from the wiki (with --check).
 ```
 
