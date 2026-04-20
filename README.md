@@ -7,6 +7,15 @@ Convert an image into a grid of Minecraft maps you can paint in-game using the [
 - an optional **combined canvas** that stitches all guide tiles together,
 - a **summary.json** with total dye counts.
 
+## Shade digits on the guides
+
+Each cell on a guide shows a small digit 0-3. That number is **how many times you need to darken the base color** after placing it:
+
+- `0` = draw a pixel, use the feather once (brightest).
+- `1` = draw, that's it (default).
+- `2` = draw, then use coal.
+- `3` = draw, then use coal twice (darkest).
+
 ## Requirements
 
 - Node.js 20+ (ES2022, ESM, global `fetch`).
@@ -45,15 +54,6 @@ Outputs:
 | `out/map_<gx>_<gy>.png` | with `--guide` | Per-map build guide. `gx` is the column (1..width), `gy` is the row (1..height). Includes a numbered ruler around the edge. |
 | `out/canvas.png` | with `--guide --combined` | All guide tiles stitched into one big image. |
 | `out/summary.json` | unless `--summary false` | Item counts per tile and overall totals. |
-
-## Shade digits on the guides
-
-Each cell on a guide shows a small digit 0-3. That number is **how many times you need to darken the base color** after placing it:
-
-- `0` = place the item, use the feather once (brightest).
-- `1` = place, that's it (default).
-- `2` = place, then use coal.
-- `3` = place, then use coal twice (darkest).
 
 ## Command-line arguments
 
