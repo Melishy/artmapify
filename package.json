@@ -20,7 +20,7 @@
     "fetch-textures": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-textures.ps1"
   },
   "dependencies": {
-    "sharp": "^0.33.5"
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@types/node": "^22.7.5",
