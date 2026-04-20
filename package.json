@@ -17,7 +17,7 @@
     "start": "node dist/cli.js",
     "dev": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit",
-    "fetch-textures": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-textures.ps1"
+    "fetch-textures": "node scripts/fetch-textures.mjs"
   },
   "dependencies": {
     "sharp": "^0.34.5"
