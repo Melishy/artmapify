@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # npm dependencies
+  # npm dependencies (CLI, repo root)
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -14,6 +14,23 @@ updates:
       # Bundle patch + minor updates into one PR per ecosystem, so Dependabot
       # doesn't spam a separate PR for every semver bump.
       npm-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # npm dependencies (web app)
+  - package-ecosystem: "npm"
+    directory: "/web"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "web"
+    groups:
+      web-npm-minor-and-patch:
         update-types:
           - "minor"
           - "patch"

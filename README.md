@@ -7,6 +7,11 @@ Convert an image into a grid of Minecraft maps you can paint in-game using the [
 - an optional **combined canvas** that stitches all guide tiles together,
 - a **summary.json** with total dye counts.
 
+Two ways to use it:
+
+- **Web app** (no install). Drop in an image, tweak settings, download a zip. See [`web/`](web/).
+- **CLI** (this repo). Scripting, batching, reproducible runs.
+
 ## Shade digits on the guides
 
 Each cell on a guide shows a small digit 0-3. That number is **how many times you need to darken the base color** after placing it:
@@ -18,7 +23,7 @@ Each cell on a guide shows a small digit 0-3. That number is **how many times yo
 
 ## Requirements
 
-- Node.js 20+ (ES2022, ESM, global `fetch`).
+- Node.js 20+ (ESM, global `fetch`).
 - npm (or pnpm/yarn).
 - Works on Windows, macOS, and Linux.
 
