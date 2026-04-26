@@ -6,8 +6,8 @@ dist/
 out/
 out-*/
 
-# Item textures are fetched by scripts/fetch-textures.ps1, not checked in
-items/
+# Item textures
+/items/
 
 # Logs and OS / editor noise
 *.log
