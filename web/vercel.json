@@ -3,11 +3,29 @@
   "framework": "nextjs",
   "headers": [
     {
+      "source": "/:base*/palette.csv",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
       "source": "/palette.csv",
       "headers": [
         {
           "key": "Cache-Control",
           "value": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/:base*/items/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, s-maxage=31536000, immutable"
         }
       ]
     },
