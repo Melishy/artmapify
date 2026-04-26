@@ -10,6 +10,7 @@
 //      from the node port, it's pure math).
 //   5. splitIntoTiles() chops the grid into 32x32 map tiles.
 
+import { withBasePath } from "./base-path";
 import { closestEntry } from "./palette";
 import type {
   Adjustments,
@@ -39,7 +40,7 @@ async function loadItemTexture(
   base: string,
 ): Promise<ImageBitmap | null> {
   try {
-    const res = await fetch(`/items/${base}.png`);
+    const res = await fetch(withBasePath(`/items/${base}.png`));
     if (!res.ok) return null;
     const blob = await res.blob();
     const bmp = await createImageBitmap(blob);

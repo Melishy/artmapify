@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { withBasePath } from "@/lib/base-path";
 import { loadItemTextures } from "@/lib/image";
 import { loadPaletteFromUrl } from "@/lib/palette";
 import {
@@ -71,7 +72,7 @@ export default function Home() {
     let cancelled = false;
     (async () => {
       try {
-        const p = await loadPaletteFromUrl("/palette.csv");
+        const p = await loadPaletteFromUrl(withBasePath("/palette.csv"));
         if (cancelled) return;
         setPalette(p);
         const t = await loadItemTextures(p);
