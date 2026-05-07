@@ -21,7 +21,7 @@ export function PreviewView({ tiles, gridW, gridH, tileSize, scale }: Props) {
 
   if (!canvas) {
     return (
-      <div className="flex aspect-square items-center justify-center rounded-md border bg-muted/30 text-sm text-muted-foreground">
+      <div className="bg-muted/30 text-muted-foreground flex aspect-square items-center justify-center rounded-md border text-sm">
         No preview yet
       </div>
     );
@@ -29,7 +29,7 @@ export function PreviewView({ tiles, gridW, gridH, tileSize, scale }: Props) {
   return (
     <CanvasView
       source={canvas}
-      className="w-full h-auto rounded-md border bg-black"
+      className="h-auto w-full rounded-md border bg-black"
       alt="Preview"
     />
   );

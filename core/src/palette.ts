@@ -1,30 +1,8 @@
-import { readFileSync } from "node:fs";
+// Pure palette parsing + nearest-color lookup. No fs, no fetch - both
+// platforms are responsible for getting the CSV text into memory however
+// they like (readFileSync, fetch, etc) and then call parsePaletteCsv.
 
-export type RGB = readonly [number, number, number];
-
-export interface PaletteEntry {
-  /** Full label, e.g. "grass1" (1 is the default placed shade). */
-  label: string;
-  /** Base item name, e.g. "grass" */
-  base: string;
-  /**
-   * Digit drawn on the guide. Matches ArtMap's click semantics from the
-   * default placed state:
-   *   0 = one feather click (brightest)
-   *   1 = placed as-is (default)
-   *   2 = one coal click
-   *   3 = two coal clicks (darkest)
-   */
-  shade: 0 | 1 | 2 | 3;
-  rgb: RGB;
-}
-
-export interface Palette {
-  entries: PaletteEntry[];
-  byLabel: Map<string, PaletteEntry>;
-  /** Fast exact-match lookup keyed by packed rgb int. */
-  byRgb: Map<number, PaletteEntry>;
-}
+import type { ColorMetric, Palette, PaletteEntry, RGB } from "./types.ts";
 
 function hexToRgb(hex: string): RGB | null {
   const s = hex.trim().replace(/^#/, "");
@@ -39,21 +17,61 @@ export function packRgb(r: number, g: number, b: number): number {
 }
 
 /**
- * Load the CSV palette. Expected columns (left to right, brightest to
- * darkest): Item, Color0, Color1, Color2, Color3.
+ * Map our shade index (0..3, brightest -> darkest) to the byte offset
+ * Minecraft map files use, per the wiki shade table:
  *
- * Column index = digit stamped on the guide = ArtMap shade action from the
- * default placed state:
+ *   shade 0 (mul 255, brightest)     -> mc shade 2
+ *   shade 1 (mul 220, default)       -> mc shade 1
+ *   shade 2 (mul 180)                -> mc shade 0
+ *   shade 3 (mul 135, darkest)       -> mc shade 3
+ *
+ * The full Minecraft map byte for a pixel is `baseColorId * 4 + shadeOffset`.
+ */
+export function shadeOffset(shade: 0 | 1 | 2 | 3): number {
+  switch (shade) {
+    case 0:
+      return 2;
+    case 1:
+      return 1;
+    case 2:
+      return 0;
+    case 3:
+      return 3;
+  }
+}
+
+/**
+ * Compute the unsigned 0..255 byte that a Minecraft map stores for a given
+ * palette entry. Two entries with the same baseColorId but different shade
+ * map to four distinct bytes, all of which decode to the same RGB triple
+ * via the wiki's shade multipliers.
+ */
+export function mcMapByte(entry: PaletteEntry): number {
+  return (entry.baseColorId * 4 + shadeOffset(entry.shade)) & 0xff;
+}
+
+/**
+ * Parse the palette CSV. Expected columns (left to right): Item, BaseId,
+ * Color0, Color1, Color2, Color3. The Color0..Color3 columns go from
+ * brightest to darkest, matching the digit stamped on the guide and the
+ * ArtMap shade action from the default placed state:
  *   Color0 = one feather click (brightest)
  *   Color1 = as placed (default)
  *   Color2 = one coal click
  *   Color3 = two coal clicks (darkest)
  */
-export function loadPalette(csvPath: string): Palette {
-  const raw = readFileSync(csvPath, "utf8").replace(/\r\n/g, "\n").trim();
+export function parsePaletteCsv(text: string): Palette {
+  const raw = text.replace(/\r\n/g, "\n").trim();
   const lines = raw.split("\n");
   const header = lines.shift();
   if (!header) throw new Error("Empty palette CSV");
+  // Older palettes (pre-monorepo) skipped the BaseId column. Detect that
+  // so we fail loudly instead of silently parsing rgb hex into baseColorId.
+  if (!/(^|,)\s*BaseId\s*(,|$)/i.test(header)) {
+    throw new Error(
+      "palette CSV missing 'BaseId' column. Expected header: Item,BaseId,Color0,Color1,Color2,Color3",
+    );
+  }
 
   const entries: PaletteEntry[] = [];
   const byLabel = new Map<string, PaletteEntry>();
@@ -64,20 +82,27 @@ export function loadPalette(csvPath: string): Palette {
     const cols = line.split(",");
     const item = cols[0];
     if (!item) continue;
-    const base = item.toLowerCase().replace(/\s+/g, "_");
+    const name = item.trim();
+    const base = name.toLowerCase().replace(/\s+/g, "_");
+    const baseColorId = parseInt(cols[1] ?? "", 10);
+    if (!Number.isFinite(baseColorId) || baseColorId < 1 || baseColorId > 63) {
+      throw new Error(
+        `Invalid BaseId for '${name}': '${cols[1]}'. Expected an integer 1..63.`,
+      );
+    }
 
-    // CSV columns 1..4 are brightest to darkest; shade digit = col - 1
-    // (0 = feather once, 1 = placed, 2 = coal once, 3 = coal twice).
-    for (let col = 1; col <= 4; col++) {
+    for (let col = 2; col <= 5; col++) {
       const hex = cols[col];
       if (!hex) continue;
       const rgb = hexToRgb(hex);
       if (!rgb) continue;
-      const shade = (col - 1) as 0 | 1 | 2 | 3;
+      const shade = (col - 2) as 0 | 1 | 2 | 3;
       const label = `${base}${shade}`;
       const entry: PaletteEntry = {
         label,
         base,
+        name,
+        baseColorId,
         shade,
         rgb,
       };
@@ -93,8 +118,6 @@ export function loadPalette(csvPath: string): Palette {
   return { entries, byLabel, byRgb };
 }
 
-export type ColorMetric = "luma-hue" | "redmean" | "rgb";
-
 /**
  * Number of dye-tool clicks required to reach each shade from the
  * default placed state.
@@ -108,21 +131,7 @@ export function clickCost(shade: 0 | 1 | 2 | 3): number {
 }
 
 /**
- * Penalty added to each palette candidate's squared-distance score,
- * proportional to how many clicks it would cost in-game. Only affects
- * near-ties; the dominant term is always color distance.
- *
- * The penalty is `clickBias * cost * cost`. Defaults to 0 (off).
- * Useful values are 5..25 for a noticeable bias.
- */
-export interface MatchOptions {
-  metric?: ColorMetric;
-  clickBias?: number;
-}
-
-/**
- * Find the palette entry whose rgb is perceptually closest to the given pixel,
- * using the selected metric.
+ * Find the palette entry whose rgb is perceptually closest to the given pixel.
  *
  * Metric trade-offs on the ArtMap palette:
  *
@@ -134,6 +143,14 @@ export interface MatchOptions {
  *       pixels to green-tinted dyes.
  *   'rgb': plain squared Euclidean. Simplest; dark tinted colors often
  *       collapse to ink_sac due to the luminance gap in the palette.
+ *
+ * `clickBias` (default 0) adds `clickBias * cost^2` to each candidate's
+ * distance, biasing near-ties toward shades that take fewer in-game
+ * clicks. Useful values are 5..25 for a noticeable bias.
+ *
+ * `ref` is the pre-dither rgb of this pixel, when available. The
+ * 'luma-hue' metric uses it as the saturation reference so that error
+ * diffusion can't push a near-gray source pixel onto a tinted dye.
  */
 export function closestEntry(
   r: number,
@@ -141,18 +158,11 @@ export function closestEntry(
   b: number,
   palette: Palette,
   metric: ColorMetric = "luma-hue",
-  /**
-   * Optional original (pre-dither) rgb of the pixel. When provided, the
-   * 'luma-hue' metric uses this to decide whether the pixel is neutral or
-   * saturated, instead of the possibly-drifted dithered rgb. This stops
-   * error diffusion from accidentally pushing neutral regions onto tinted
-   * dyes like warped_nylium or pink_dye.
-   */
   ref?: readonly [number, number, number],
   clickBias = 0,
 ): PaletteEntry {
-  // Fast path: exact match (only when there's no click bias, otherwise
-  // we might still prefer a same-color entry with a lower click cost).
+  // Fast path: exact match (skipped if click bias might prefer a same-color
+  // entry with a lower click cost).
   if (clickBias <= 0) {
     const exact = palette.byRgb.get(packRgb(r, g, b));
     if (exact) return exact;

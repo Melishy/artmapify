@@ -1,0 +1,29 @@
+# Dependencies and build artifacts
+node_modules/
+**/node_modules/
+**/dist/
+**/.next/
+**/out/
+
+# Generated files
+**/palette-data.ts
+**/next-env.d.ts
+**/tsconfig.tsbuildinfo
+package-lock.json
+
+# Binary / data
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.ico
+*.dat
+*.csv
+
+# Auto-generated lockfiles
+*.lock
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db

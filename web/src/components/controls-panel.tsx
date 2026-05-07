@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { PRESETS } from "@/lib/presets";
 import type { PipelineSettings } from "@/lib/types";
 
 export interface ControlsPanelProps {
@@ -35,10 +36,32 @@ export function ControlsPanel(props: ControlsPanelProps) {
   const setAdj = <K extends keyof PipelineSettings["adjustments"]>(
     key: K,
     value: PipelineSettings["adjustments"][K],
-  ) => onChange({ ...settings, adjustments: { ...settings.adjustments, [key]: value } });
+  ) =>
+    onChange({
+      ...settings,
+      adjustments: { ...settings.adjustments, [key]: value },
+    });
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-muted-foreground inline-flex items-center gap-1 text-[11px] font-semibold tracking-wide uppercase">
+          <Sparkles className="size-3.5" />
+          Presets
+        </span>
+        {PRESETS.map((p) => (
+          <Button
+            key={p.id}
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => onChange(p.apply(settings))}
+            title={p.description}
+          >
+            {p.label}
+          </Button>
+        ))}
+      </div>
       <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
         <Section title="Canvas">
           <Row>
@@ -73,9 +96,7 @@ export function ControlsPanel(props: ControlsPanelProps) {
             <Field label="Fit">
               <SelectEnum
                 value={settings.fit}
-                onValueChange={(v) =>
-                  set("fit", v as PipelineSettings["fit"])
-                }
+                onValueChange={(v) => set("fit", v as PipelineSettings["fit"])}
                 options={["fill", "cover", "contain"]}
               />
             </Field>
@@ -174,10 +195,7 @@ export function ControlsPanel(props: ControlsPanelProps) {
             <SelectEnum
               value={settings.adjustments.filter}
               onValueChange={(v) =>
-                setAdj(
-                  "filter",
-                  v as PipelineSettings["adjustments"]["filter"],
-                )
+                setAdj("filter", v as PipelineSettings["adjustments"]["filter"])
               }
               options={["none", "grayscale", "sepia"]}
             />
@@ -271,7 +289,7 @@ function Section({
 }) {
   return (
     <section className="space-y-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
         {title}
       </h3>
       <div className="space-y-3">{children}</div>
@@ -294,10 +312,10 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Label className="text-muted-foreground text-xs">{label}</Label>
       {children}
       {hint ? (
-        <p className="text-[11px] text-muted-foreground/80">{hint}</p>
+        <p className="text-muted-foreground/80 text-[11px]">{hint}</p>
       ) : null}
     </div>
   );
@@ -351,13 +369,13 @@ function SliderField({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Label className="text-muted-foreground text-xs">{label}</Label>
       <Slider
         value={[value]}
         min={min}
         max={max}
         step={step}
-        onValueChange={(v) => onChange(Array.isArray(v) ? v[0] ?? value : v)}
+        onValueChange={(v) => onChange(Array.isArray(v) ? (v[0] ?? value) : v)}
       />
     </div>
   );

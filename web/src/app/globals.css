@@ -117,6 +117,51 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+@keyframes kofi-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Floating settings popover: scales + slides down from the top, with a
+ * fade-out on close. Used by the page-level settings panel. */
+@keyframes settings-pop-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+@keyframes settings-pop-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.97);
+  }
+}
+@keyframes settings-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes settings-backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -126,5 +171,34 @@
   }
   body {
     @apply text-foreground;
+  }
+
+  /* Thin, theme-aware scrollbars site-wide. Firefox uses scrollbar-*
+   * properties; WebKit/Blink uses ::-webkit-scrollbar. The colors track
+   * the muted/foreground tokens so the bar feels native in light/dark. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--foreground) 25%, transparent)
+      transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, var(--foreground) 22%, transparent);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklab, var(--foreground) 40%, transparent);
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }

@@ -4,16 +4,22 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, extname, join, resolve } from "node:path";
 import sharp from "sharp";
-import { loadPalette, type ColorMetric } from "./palette.js";
+import { randomUUID } from "node:crypto";
 import {
-  prepareImage,
+  DEFAULT_ADJUSTMENTS,
+  exportArtMap,
+  isUuid,
+  offlinePlayerUuid,
   quantize,
   splitIntoTiles,
-  DEFAULT_ADJUSTMENTS,
+  todayDDMMYYYY,
   type Adjustments,
+  type ColorMetric,
   type DitherMethod,
   type FitMode,
-} from "./image.js";
+} from "@artmapify/core";
+import { loadPalette } from "./palette.js";
+import { prepareImage } from "./image.js";
 import {
   renderCanvasImage,
   renderPreviewImage,
@@ -23,7 +29,8 @@ import {
 interface Args {
   input: string;
   outDir: string;
-  palette: string;
+  /** Path to a custom palette CSV, or null to use the bundled one. */
+  palette: string | null;
   itemsDir: string;
   gridW: number;
   gridH: number;
@@ -45,6 +52,12 @@ interface Args {
   guide: boolean;
   combined: boolean;
   summary: boolean;
+  /** When set, also emit an ArtMap import JSON to this path (relative to --out unless absolute). */
+  exportJson: string | null;
+  /** Base title used in the ArtMap export. 3..16 chars; truncated if longer. */
+  title: string | null;
+  /** Player UUID or name. Names are converted to Bukkit offline UUIDs. */
+  artist: string | null;
 }
 
 /** Parse a required int arg; throw a clear error on NaN / bad input. */
@@ -176,7 +189,7 @@ function parseArgs(argv: string[]): Args {
   return {
     input: resolve(input),
     outDir: resolve(args.out ?? "out"),
-    palette: resolve(args.palette ?? "palette.csv"),
+    palette: args.palette ? resolve(args.palette) : null,
     itemsDir: resolve(args.items ?? "items"),
     gridW: parseIntArg("width", args.width, 4),
     gridH: parseIntArg("height", args.height, 4),
@@ -208,6 +221,9 @@ function parseArgs(argv: string[]): Args {
     guide: args.guide === "true",
     combined: args.combined === "true",
     summary: args.summary !== "false",
+    exportJson: args["export-json"] ?? null,
+    title: args.title ?? null,
+    artist: args.artist ?? null,
   };
 }
 
@@ -220,7 +236,8 @@ Usage:
 Options:
   -h, --help           Show this help and exit.
   --out <dir>          Output directory (default: out)
-  --palette <csv>      Palette CSV (default: palette.csv)
+  --palette <csv>      Custom palette CSV. Defaults to the bundled
+                       @artmapify/core palette.
   --items <dir>        Item textures folder (default: items)
   --width <n>          Canvas width in tiles (default: 4)
   --height <n>         Canvas height in tiles (default: 4)
@@ -265,6 +282,16 @@ Options:
   --guide              Also emit per-tile guide images (textures + shade #)
   --combined           With --guide, also stitch all tiles into canvas.png
   --summary false      Skip writing summary.json
+  --export-json <path> Emit an ArtMap import JSON to <path> (relative to
+                       --out, or absolute). One row per tile.
+  --title <text>       ArtMap title for --export-json. 3..16 chars; for
+                       multi-tile grids each tile gets a R<row>C<col>
+                       suffix that fits in 16 chars. Default: input
+                       filename (without extension).
+  --artist <id>        Player UUID (with dashes) or name. A name is
+                       converted to the Bukkit offline-mode UUID via
+                       MD5("OfflinePlayer:<name>"). Default: a random v4
+                       UUID.
 
 Outputs (in --out dir):
   preview.png          What the art will look like in-game (compare to source).
@@ -272,6 +299,10 @@ Outputs (in --out dir):
   canvas.png           (--guide --combined) All guide tiles stitched.
   summary.json         Dye counts per tile and totals, plus an inputHash
                        + argsHash for staleness detection.
+  <export-json>        (--export-json) ArtMap-importable JSON, one row
+                       per tile. Each row carries the gzip+base64 mapData
+                       and Java Arrays.hashCode hash that ArtMap stores
+                       in plugins/ArtMap/Art.db.
 `);
 }
 
@@ -443,7 +474,7 @@ async function main(): Promise<void> {
       fit: args.fit,
       aspectAuto: args.aspectAuto,
       adjustments: args.adjustments,
-      palette: basename(args.palette),
+      palette: args.palette ? basename(args.palette) : "<builtin>",
     };
     const argsHash = createHash("sha256")
       .update(JSON.stringify(hashableArgs))
@@ -465,7 +496,44 @@ async function main(): Promise<void> {
     console.log("  wrote summary.json");
   }
 
+  // ArtMap import JSON.
+  if (args.exportJson) {
+    const artist = await resolveArtist(args.artist);
+    const title =
+      args.title?.trim() ||
+      basename(args.input, extname(args.input)) ||
+      "Untitled";
+    const rows = exportArtMap(tiles, args.tileSize, args.gridW, args.gridH, {
+      title,
+      artist,
+      date: todayDDMMYYYY(),
+    });
+    const target = resolve(args.outDir, args.exportJson);
+    await mkdir(dirnameSafe(target), { recursive: true });
+    await writeFile(target, JSON.stringify(rows, null, 2));
+    console.log(
+      `  wrote ${target} (${rows.length} ArtMap row${rows.length === 1 ? "" : "s"}, artist=${artist})`,
+    );
+  }
+
   console.log(`Done. Output -> ${args.outDir}`);
+}
+
+function dirnameSafe(p: string): string {
+  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+  return i < 0 ? "." : p.slice(0, i) || "/";
+}
+
+/**
+ * Resolve the --artist argument into a UUID. Accepts either an existing
+ * UUID (returned as-is) or a player name (converted to the offline-mode
+ * UUID Bukkit assigns). When omitted, generates a random v4 UUID.
+ */
+async function resolveArtist(raw: string | null): Promise<string> {
+  if (!raw || !raw.trim()) return randomUUID();
+  const s = raw.trim();
+  if (isUuid(s)) return s;
+  return await offlinePlayerUuid(s);
 }
 
 main().catch((err) => {

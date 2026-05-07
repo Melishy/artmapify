@@ -1,36 +1,43 @@
 "use client";
 
+import { loadBuiltinPalette } from "@artmapify/core";
 import { ChevronDown, Loader2, SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ControlsPanel } from "@/components/controls-panel";
+
+import { ArtMapExport } from "@/components/artmap-export";
+import { CostBanner } from "@/components/cost-banner";
 import { DownloadZip } from "@/components/download-zip";
 import { DropTarget, SourceButton, SourceChip } from "@/components/drop-zone";
 import { DyeTotals } from "@/components/dye-totals";
 import { GitHubStarButton } from "@/components/github-star-button";
+import { KoFiButton } from "@/components/ko-fi-button";
 import { PreviewView } from "@/components/preview-view";
+import { SettingsPopover } from "@/components/settings-popover";
 import { TileViewer } from "@/components/tile-viewer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
 import { withBasePath } from "@/lib/base-path";
 import { loadItemTextures } from "@/lib/image";
-import { loadPaletteFromUrl } from "@/lib/palette";
-import {
-  type PipelineResult,
-  resolveAspect,
-  runPipeline,
-} from "@/lib/pipeline";
+import { type PipelineResult, resolveAspect } from "@/lib/pipeline";
+import { PipelineClient } from "@/lib/pipeline-client";
+import { loadCachedSettings, saveCachedSettings } from "@/lib/settings-cache";
 import {
   clearSourceFile,
   loadSourceFile,
   saveSourceFile,
 } from "@/lib/source-cache";
-import { DEFAULT_ADJUSTMENTS, type Palette, type PipelineSettings } from "@/lib/types";
+import {
+  DEFAULT_ADJUSTMENTS,
+  type Palette,
+  type PipelineSettings,
+} from "@/lib/types";
+import { usePasteImageListener } from "@/lib/use-clipboard-image";
+import { cn } from "@/lib/utils";
 
 const DEFAULT_SETTINGS: PipelineSettings = {
-  gridW: 4,
-  gridH: 4,
+  gridW: 3,
+  gridH: 3,
   tileSize: 32,
   cellSize: 32,
   previewScale: 4,
@@ -59,6 +66,8 @@ export default function Home() {
   const [sourceSize, setSourceSize] = useState<{ w: number; h: number } | null>(
     null,
   );
+  // Settings start at defaults and get hydrated from localStorage in an
+  // effect (not during render) so SSR HTML matches the first client paint.
   const [settings, setSettings] = useState<PipelineSettings>(DEFAULT_SETTINGS);
   const [aspectAuto, setAspectAuto] = useState(false);
 
@@ -66,23 +75,52 @@ export default function Home() {
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // ArtMap import-JSON metadata. Kept at page-level (not inside
+  // PipelineSettings) because they don't affect the rendered tiles.
+  const [artmapTitle, setArtmapTitle] = useState("");
+  const [artmapArtist, setArtmapArtist] = useState("");
+  // Track whether we've hydrated from cache yet, so the persistence
+  // effect below doesn't overwrite the cache with default values
+  // immediately after mount.
+  const hydratedRef = useRef(false);
 
-  // Load palette + textures once.
+  // Hydrate persisted state from localStorage after mount.
+  useEffect(() => {
+    const cached = loadCachedSettings();
+    if (cached.settings)
+      setSettings({ ...DEFAULT_SETTINGS, ...cached.settings });
+    if (cached.aspectAuto !== undefined) setAspectAuto(cached.aspectAuto);
+    if (cached.artmapTitle !== undefined) setArtmapTitle(cached.artmapTitle);
+    if (cached.artmapArtist !== undefined) setArtmapArtist(cached.artmapArtist);
+    hydratedRef.current = true;
+  }, []);
+
+  // Persist settings on every change once hydrated.
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    saveCachedSettings({ settings, aspectAuto, artmapTitle, artmapArtist });
+  }, [settings, aspectAuto, artmapTitle, artmapArtist]);
+
+  // Load palette synchronously from the bundled @artmapify/core copy,
+  // then async-load the item textures from /items/.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const p = await loadPaletteFromUrl(withBasePath("/palette.csv"));
-        if (cancelled) return;
-        setPalette(p);
-        const t = await loadItemTextures(p);
-        if (cancelled) return;
-        setTextures(t as Map<string, ImageBitmap>);
-      } catch (e) {
-        if (!cancelled)
-          setAssetError(e instanceof Error ? e.message : String(e));
-      }
-    })();
+    try {
+      const p = loadBuiltinPalette();
+      setPalette(p);
+      (async () => {
+        try {
+          const t = await loadItemTextures(p);
+          if (cancelled) return;
+          setTextures(t as Map<string, ImageBitmap>);
+        } catch (e) {
+          if (!cancelled)
+            setAssetError(e instanceof Error ? e.message : String(e));
+        }
+      })();
+    } catch (e) {
+      setAssetError(e instanceof Error ? e.message : String(e));
+    }
     return () => {
       cancelled = true;
     };
@@ -105,6 +143,11 @@ export default function Home() {
     if (f) void saveSourceFile(f);
     else void clearSourceFile();
   }, []);
+
+  // Paste from clipboard, anywhere on the page.
+  usePasteImageListener(
+    useCallback((f: File) => handlePickFile(f), [handlePickFile]),
+  );
 
   // Capture source image natural dimensions for aspect-auto.
   useEffect(() => {
@@ -141,9 +184,20 @@ export default function Home() {
     return { ...settings, gridW, gridH };
   }, [aspectAuto, sourceSize, settings]);
 
-  // Debounced pipeline runs. Inlined into the effect so React Compiler can
-  // see the full external-sync lifecycle.
+  // Debounced pipeline runs, dispatched to a Web Worker so the main
+  // thread stays responsive even on big grids with dither enabled.
+  // The worker is reused across runs; stale runs are filtered out via
+  // a monotonic seq counter rather than terminating the worker.
   const runSeq = useRef(0);
+  const clientRef = useRef<PipelineClient | null>(null);
+  if (!clientRef.current) clientRef.current = new PipelineClient();
+  useEffect(() => {
+    return () => {
+      // Hard-stop the worker on unmount so it doesn't leak.
+      clientRef.current?.terminate();
+      clientRef.current = null;
+    };
+  }, []);
   useEffect(() => {
     if (!file || !palette) return;
     const seq = ++runSeq.current;
@@ -151,8 +205,10 @@ export default function Home() {
     setRunning(true);
     setRunError(null);
     const handle = setTimeout(async () => {
+      const client = clientRef.current;
+      if (!client) return;
       try {
-        const res = await runPipeline(file, palette, effective);
+        const res = await client.run(file, effective);
         if (seq !== runSeq.current) return;
         setResult(res);
       } catch (e) {
@@ -169,14 +225,14 @@ export default function Home() {
     if (!file) return null;
     if (!palette || !textures)
       return (
-        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
           <Loader2 className="size-3 animate-spin" />
           Loading palette
         </span>
       );
     if (running)
       return (
-        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
           <Loader2 className="size-3 animate-spin" />
           Processing
         </span>
@@ -186,11 +242,19 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
+      <header className="bg-background/95 sticky top-0 z-30 border-b backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 py-2">
-          <div className="mr-2 flex items-baseline gap-2">
+          <div className="mr-2 flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={withBasePath("/artmapify.ico")}
+              alt=""
+              aria-hidden
+              className="size-5 shrink-0"
+              style={{ imageRendering: "pixelated" }}
+            />
             <h1 className="text-lg font-semibold tracking-tight">ArtMapify</h1>
-            <p className="hidden text-xs text-muted-foreground md:block">
+            <p className="text-muted-foreground hidden text-xs md:block">
               Images into Minecraft dye guides
             </p>
           </div>
@@ -199,6 +263,7 @@ export default function Home() {
             {file ? (
               <SourceChip
                 onFile={handlePickFile}
+                onClear={() => handlePickFile(null)}
                 file={file}
                 dimensions={sourceSize}
               />
@@ -225,37 +290,23 @@ export default function Home() {
                 )}
               />
             </Button>
-            {result && textures && file ? (
-              <DownloadZip
-                result={result}
-                itemTextures={textures}
-                fileName={file.name}
-              />
-            ) : null}
+            <KoFiButton username="melishy" />
             <GitHubStarButton owner="Melishy" repo="artmapify" />
           </div>
         </div>
-
-        {settingsOpen ? (
-          <div
-            id="settings-panel"
-            className="border-t bg-muted/30"
-          >
-            <div className="mx-auto max-w-7xl px-4 py-4">
-              <ControlsPanel
-                settings={settings}
-                aspectAuto={aspectAuto}
-                onChange={setSettings}
-                onAspectAutoChange={setAspectAuto}
-                onReset={() => {
-                  setSettings(DEFAULT_SETTINGS);
-                  setAspectAuto(false);
-                }}
-              />
-            </div>
-          </div>
-        ) : null}
       </header>
+      <SettingsPopover
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={settings}
+        aspectAuto={aspectAuto}
+        onChange={setSettings}
+        onAspectAutoChange={setAspectAuto}
+        onReset={() => {
+          setSettings(DEFAULT_SETTINGS);
+          setAspectAuto(false);
+        }}
+      />
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-4">
         {assetError ? (
@@ -278,30 +329,24 @@ export default function Home() {
             />
           </div>
         ) : !palette || !textures ? (
-          <div className="flex min-h-[60vh] items-center justify-center rounded-lg border bg-muted/30 text-sm text-muted-foreground">
+          <div className="bg-muted/30 text-muted-foreground flex min-h-[60vh] items-center justify-center rounded-lg border text-sm">
             <Loader2 className="mr-2 size-4 animate-spin" />
             Loading palette
           </div>
         ) : !result ? (
-          <div className="flex min-h-[60vh] items-center justify-center rounded-lg border bg-muted/30 text-sm text-muted-foreground">
+          <div className="bg-muted/30 text-muted-foreground flex min-h-[60vh] items-center justify-center rounded-lg border text-sm">
             <Loader2 className="mr-2 size-4 animate-spin" />
             Processing
           </div>
         ) : (
           <Tabs defaultValue="preview" className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <TabsList>
-                <TabsTrigger value="preview">Preview</TabsTrigger>
-                <TabsTrigger value="guide">Guide</TabsTrigger>
-                <TabsTrigger value="dyes">Dye totals</TabsTrigger>
-              </TabsList>
-              <SourceStats
-                sourceSize={sourceSize}
-                gridW={effective.gridW}
-                gridH={effective.gridH}
-                tileSize={effective.tileSize}
-              />
-            </div>
+            <CostBanner summary={result.summary} />
+            <TabsList>
+              <TabsTrigger value="preview">Preview</TabsTrigger>
+              <TabsTrigger value="guide">Guide</TabsTrigger>
+              <TabsTrigger value="dyes">Dye totals</TabsTrigger>
+              <TabsTrigger value="export">Export</TabsTrigger>
+            </TabsList>
             <TabsContent value="preview">
               <PreviewView
                 tiles={result.tiles}
@@ -319,59 +364,63 @@ export default function Home() {
               />
             </TabsContent>
             <TabsContent value="dyes">
-              <DyeTotals
-                summary={result.summary}
-                itemTextures={textures}
-              />
+              <DyeTotals summary={result.summary} itemTextures={textures} />
+            </TabsContent>
+            <TabsContent value="export">
+              <div className="bg-muted/30 space-y-6 rounded-lg border p-4">
+                <section className="space-y-3">
+                  <div>
+                    <h2 className="text-sm font-semibold">ArtMap import</h2>
+                    <p className="text-muted-foreground text-xs">
+                      Skip the painting step entirely. Generates a JSON file you
+                      drop into your ArtMap server's plugin folder and import
+                      with{" "}
+                      <code className="bg-background rounded px-1 py-0.5 font-mono text-[10px]">
+                        /art import
+                      </code>
+                      .
+                    </p>
+                  </div>
+                  <ArtMapExport
+                    result={result}
+                    fileName={file.name}
+                    title={artmapTitle}
+                    onTitleChange={setArtmapTitle}
+                    artist={artmapArtist}
+                    onArtistChange={setArtmapArtist}
+                  />
+                </section>
+
+                <section className="space-y-2">
+                  <h2 className="text-sm font-semibold">
+                    Build guides + preview
+                  </h2>
+                  <p className="text-muted-foreground text-xs">
+                    Per-tile guide images, optional combined canvas, preview,
+                    and a summary JSON. Bundled into a single zip ready to print
+                    or open on a second monitor.
+                  </p>
+                  {textures ? (
+                    <DownloadZip
+                      result={result}
+                      itemTextures={textures}
+                      fileName={file.name}
+                      artmapTitle={artmapTitle}
+                      artmapArtist={artmapArtist}
+                    />
+                  ) : null}
+                </section>
+              </div>
             </TabsContent>
           </Tabs>
         )}
       </main>
 
       <footer className="border-t">
-        <div className="mx-auto max-w-7xl px-4 py-3 text-xs text-muted-foreground">
+        <div className="text-muted-foreground mx-auto max-w-7xl px-4 py-3 text-xs">
           Everything runs in your browser. Nothing is uploaded.
         </div>
       </footer>
-    </div>
-  );
-}
-
-function SourceStats({
-  sourceSize,
-  gridW,
-  gridH,
-  tileSize,
-}: {
-  sourceSize: { w: number; h: number } | null;
-  gridW: number;
-  gridH: number;
-  tileSize: number;
-}) {
-  const blocksW = gridW * tileSize;
-  const blocksH = gridH * tileSize;
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums">
-      {sourceSize ? (
-        <span>
-          Source{" "}
-          <span className="font-medium text-foreground">
-            {sourceSize.w} x {sourceSize.h}
-          </span>
-        </span>
-      ) : null}
-      <span>
-        Grid{" "}
-        <span className="font-medium text-foreground">
-          {gridW} x {gridH}
-        </span>
-      </span>
-      <span>
-        Blocks{" "}
-        <span className="font-medium text-foreground">
-          {blocksW} x {blocksH}
-        </span>
-      </span>
     </div>
   );
 }

@@ -1,26 +1,17 @@
-// Browser port of root src/image.ts. Uses Canvas 2D instead of sharp.
-//
-// Pipeline:
+// Browser-side image preparation. Quantization and tile-splitting moved
+// to @artmapify/core; this file owns just the canvas-bound stages:
 //   1. Decode Blob -> ImageBitmap.
 //   2. Resize onto target canvas using the selected fit mode.
 //   3. Apply brightness / contrast / saturation / filter / sharpness
 //      on the ImageData pixel buffer.
-//   4. quantize() matches each pixel to a palette entry, with optional
-//      error-diffusion dither and neutral-bias damping (copied verbatim
-//      from the node port, it's pure math).
-//   5. splitIntoTiles() chops the grid into 32x32 map tiles.
 
 import { withBasePath } from "./base-path";
-import { closestEntry } from "./palette";
 import type {
   Adjustments,
-  ColorMetric,
   DitherMethod,
   FitMode,
   Palette,
-  PaletteEntry,
   RawImage,
-  Tile,
 } from "./types";
 
 export async function decodeBlob(blob: Blob): Promise<ImageBitmap> {
@@ -36,9 +27,7 @@ export async function decodeBlob(blob: Blob): Promise<ImageBitmap> {
  * crop to the first frame (the top `width x width` square) so it
  * renders as a single block face instead of a squished ribbon.
  */
-async function loadItemTexture(
-  base: string,
-): Promise<ImageBitmap | null> {
+async function loadItemTexture(base: string): Promise<ImageBitmap | null> {
   try {
     const res = await fetch(withBasePath(`/items/${base}.png`));
     if (!res.ok) return null;
@@ -290,148 +279,6 @@ function applyFilter(img: ImageData, filter: Adjustments["filter"]): void {
   }
 }
 
-/** Same math as root src/image.ts#quantize, pure so it ports verbatim. */
-export function quantize(
-  raw: RawImage,
-  palette: Palette,
-  dither: DitherMethod,
-  metric: ColorMetric = "luma-hue",
-  clickBias = 0,
-  gammaDither = false,
-): PaletteEntry[] {
-  const { width: w, height: h } = raw;
-  const buf = new Float32Array(w * h * 3);
-  const orig = new Uint8Array(w * h * 3);
-
-  if (gammaDither) {
-    for (let i = 0, j = 0; i < raw.data.length; i += 4, j += 3) {
-      const sr = raw.data[i]!;
-      const sg = raw.data[i + 1]!;
-      const sb = raw.data[i + 2]!;
-      buf[j] = srgbToLinear255(sr);
-      buf[j + 1] = srgbToLinear255(sg);
-      buf[j + 2] = srgbToLinear255(sb);
-      orig[j] = sr;
-      orig[j + 1] = sg;
-      orig[j + 2] = sb;
-    }
-  } else {
-    for (let i = 0, j = 0; i < raw.data.length; i += 4, j += 3) {
-      buf[j] = raw.data[i]!;
-      buf[j + 1] = raw.data[i + 1]!;
-      buf[j + 2] = raw.data[i + 2]!;
-      orig[j] = raw.data[i]!;
-      orig[j + 1] = raw.data[i + 1]!;
-      orig[j + 2] = raw.data[i + 2]!;
-    }
-  }
-
-  const result: PaletteEntry[] = new Array(w * h);
-  const weights = DITHER_WEIGHTS[dither];
-
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const idx = (y * w + x) * 3;
-      const or = buf[idx]!;
-      const og = buf[idx + 1]!;
-      const ob = buf[idx + 2]!;
-      const sr = gammaDither ? linearToSrgb255(or) : clamp255(or);
-      const sg = gammaDither ? linearToSrgb255(og) : clamp255(og);
-      const sb = gammaDither ? linearToSrgb255(ob) : clamp255(ob);
-      const refR = orig[idx]!;
-      const refG = orig[idx + 1]!;
-      const refB = orig[idx + 2]!;
-      const entry = closestEntry(
-        sr,
-        sg,
-        sb,
-        palette,
-        metric,
-        [refR, refG, refB],
-        clickBias,
-      );
-      result[y * w + x] = entry;
-
-      if (weights) {
-        const entryR = gammaDither
-          ? srgbToLinear255(entry.rgb[0])
-          : entry.rgb[0];
-        const entryG = gammaDither
-          ? srgbToLinear255(entry.rgb[1])
-          : entry.rgb[1];
-        const entryB = gammaDither
-          ? srgbToLinear255(entry.rgb[2])
-          : entry.rgb[2];
-        let er = or - entryR;
-        let eg = og - entryG;
-        let eb = ob - entryB;
-        const refY = 0.299 * refR + 0.587 * refG + 0.114 * refB;
-        const refU = refB - refY;
-        const refV = refR - refY;
-        const refSat = Math.sqrt(refU * refU + refV * refV);
-        if (refSat < 12) {
-          const damp = 1 - refSat / 12;
-          const avg = (er + eg + eb) / 3;
-          er = er * (1 - damp) + avg * damp;
-          eg = eg * (1 - damp) + avg * damp;
-          eb = eb * (1 - damp) + avg * damp;
-        }
-        for (const [dx, dy, wgt] of weights) {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
-          const nidx = (ny * w + nx) * 3;
-          buf[nidx] += er * wgt;
-          buf[nidx + 1] += eg * wgt;
-          buf[nidx + 2] += eb * wgt;
-        }
-      }
-    }
-  }
-
-  return result;
-}
-
-export function splitIntoTiles(
-  grid: PaletteEntry[],
-  width: number,
-  gridW: number,
-  gridH: number,
-  tileSize: number,
-): Tile[] {
-  const tiles: Tile[] = [];
-  for (let ty = 0; ty < gridH; ty++) {
-    for (let tx = 0; tx < gridW; tx++) {
-      const cells: PaletteEntry[] = new Array(tileSize * tileSize);
-      for (let y = 0; y < tileSize; y++) {
-        for (let x = 0; x < tileSize; x++) {
-          const sx = tx * tileSize + x;
-          const sy = ty * tileSize + y;
-          cells[y * tileSize + x] = grid[sy * width + sx]!;
-        }
-      }
-      tiles.push({ gx: tx + 1, gy: ty + 1, cells });
-    }
-  }
-  return tiles;
-}
-
-function srgbToLinear255(v: number): number {
-  const s = v / 255;
-  const lin = s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  return lin * 255;
-}
-
-function linearToSrgb255(v: number): number {
-  const lin = v / 255;
-  if (lin <= 0) return 0;
-  if (lin >= 1) return 255;
-  const s =
-    lin <= 0.0031308 ? lin * 12.92 : 1.055 * Math.pow(lin, 1 / 2.4) - 0.055;
-  const out = s * 255;
-  return out < 0 ? 0 : out > 255 ? 255 : out | 0;
-}
-
 function clamp255(v: number): number {
   if (v < 0) return 0;
   if (v > 255) return 255;
@@ -440,6 +287,13 @@ function clamp255(v: number): number {
 
 function makeCanvas(w: number, h: number): HTMLCanvasElement | OffscreenCanvas {
   if (typeof OffscreenCanvas !== "undefined") return new OffscreenCanvas(w, h);
+  // Fallback for environments without OffscreenCanvas. Web workers always
+  // have it; this branch only fires on the main thread in old browsers.
+  if (typeof document === "undefined") {
+    throw new Error(
+      "OffscreenCanvas unavailable and no document to fall back to",
+    );
+  }
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
@@ -451,34 +305,5 @@ function get2d(
 ): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Failed to get 2D context");
-  return ctx as
-    | CanvasRenderingContext2D
-    | OffscreenCanvasRenderingContext2D;
+  return ctx as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 }
-
-const DITHER_WEIGHTS: Record<
-  DitherMethod,
-  ReadonlyArray<readonly [number, number, number]> | null
-> = {
-  none: null,
-  "floyd-steinberg": [
-    [1, 0, 7 / 16],
-    [-1, 1, 3 / 16],
-    [0, 1, 5 / 16],
-    [1, 1, 1 / 16],
-  ],
-  burkes: [
-    [1, 0, 8 / 32],
-    [2, 0, 4 / 32],
-    [-2, 1, 2 / 32],
-    [-1, 1, 4 / 32],
-    [0, 1, 8 / 32],
-    [1, 1, 4 / 32],
-    [2, 1, 2 / 32],
-  ],
-  "sierra-lite": [
-    [1, 0, 2 / 4],
-    [-1, 1, 1 / 4],
-    [0, 1, 1 / 4],
-  ],
-};

@@ -12,7 +12,7 @@ interface Props {
 export function DyeTotals({ summary, itemTextures }: Props) {
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+      <div className="text-muted-foreground flex flex-wrap gap-2 text-xs">
         <Badge variant="outline">{summary.totalCells} cells</Badge>
         <Badge variant="outline">{summary.totalClicks} clicks</Badge>
         <Badge variant="outline">
@@ -21,7 +21,7 @@ export function DyeTotals({ summary, itemTextures }: Props) {
       </div>
       <div className="max-h-[70vh] min-h-[28rem] overflow-auto rounded-md border">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-muted/80 text-xs text-muted-foreground backdrop-blur">
+          <thead className="bg-muted/80 text-muted-foreground sticky top-0 z-10 text-xs backdrop-blur">
             <tr>
               <th className="px-2 py-1.5 text-left">Item</th>
               <th className="px-2 py-1.5 text-left">Color</th>
@@ -38,7 +38,7 @@ export function DyeTotals({ summary, itemTextures }: Props) {
                 <tr key={d.label} className="border-t">
                   <td className="px-2 py-1.5">
                     <div className="flex items-center gap-2">
-                      <div className="size-6 overflow-hidden rounded-sm border bg-muted">
+                      <div className="bg-muted size-6 overflow-hidden rounded-sm border">
                         {texture ? (
                           <CanvasView
                             source={texture}

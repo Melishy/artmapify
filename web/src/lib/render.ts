@@ -2,11 +2,7 @@
 // Returns OffscreenCanvas / HTMLCanvasElement that callers can turn into
 // Blobs, draw on screen, or upload.
 
-import type {
-  PaletteEntry,
-  RenderOptions,
-  Tile,
-} from "./types";
+import type { PaletteEntry, RenderOptions, Tile } from "./types";
 
 // 5x7 pixel glyphs for digits 0..9 and '/'. Kept identical to node port so
 // outputs line up bit-for-bit.
@@ -28,9 +24,7 @@ const GLYPH_W = 5;
 const GLYPH_H = 7;
 
 export type AnyCanvas = HTMLCanvasElement | OffscreenCanvas;
-type Any2D =
-  | CanvasRenderingContext2D
-  | OffscreenCanvasRenderingContext2D;
+type Any2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
 function makeCanvas(w: number, h: number): AnyCanvas {
   if (typeof OffscreenCanvas !== "undefined") return new OffscreenCanvas(w, h);
@@ -261,8 +255,7 @@ function drawCell(
   }
 
   // Digit glyph.
-  const digitScale =
-    opts.digitScale ?? Math.max(1, Math.floor(size / 16));
+  const digitScale = opts.digitScale ?? Math.max(1, Math.floor(size / 16));
   const glyphW = GLYPH_W * digitScale;
   const glyphH = GLYPH_H * digitScale;
   const digitPad = Math.max(1, Math.floor(digitScale));
@@ -414,7 +407,9 @@ function renderLabelToCanvas(
 /** Convert any canvas (off- or on-screen) to a PNG Blob. */
 export async function canvasToBlob(canvas: AnyCanvas): Promise<Blob> {
   if ("convertToBlob" in canvas) {
-    return await (canvas as OffscreenCanvas).convertToBlob({ type: "image/png" });
+    return await (canvas as OffscreenCanvas).convertToBlob({
+      type: "image/png",
+    });
   }
   return await new Promise<Blob>((resolve, reject) => {
     (canvas as HTMLCanvasElement).toBlob((b) => {
