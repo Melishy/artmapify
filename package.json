@@ -19,7 +19,7 @@
     "build": "npm run build:core && npm run build:cli && npm run build:web",
     "build:core": "npm run build --workspace @artmapify/core",
     "build:cli": "npm run build --workspace artmapify",
-    "build:web": "npm run build --workspace web",
+    "build:web": "npm run build:core && npm run build --workspace web",
     "dev:cli": "npm run dev --workspace artmapify",
     "dev:web": "npm run dev --workspace web",
     "typecheck": "npm run build:core && npm run typecheck --workspaces --if-present",
