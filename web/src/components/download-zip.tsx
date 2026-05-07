@@ -22,6 +22,8 @@ interface Props {
   artmapTitle: string;
   /** Artist UUID or name. Empty = random UUID, but only used when title is set. */
   artmapArtist: string;
+  /** Per-tile suffix template, e.g. _R{row}C{col}. */
+  artmapSuffix: string;
 }
 
 export function DownloadZip({
@@ -30,6 +32,7 @@ export function DownloadZip({
   fileName,
   artmapTitle,
   artmapArtist,
+  artmapSuffix,
 }: Props) {
   const [busy, setBusy] = useState(false);
 
@@ -107,6 +110,7 @@ export function DownloadZip({
           fileName,
           artmapTitle,
           artmapArtist,
+          artmapSuffix,
         );
         zip.file("artmap.json", artmapJson);
       }

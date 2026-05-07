@@ -18,6 +18,7 @@ interface CachedSettings {
   aspectAuto: boolean;
   artmapTitle: string;
   artmapArtist: string;
+  artmapSuffix: string;
 }
 
 export type CachedSettingsPartial = Partial<CachedSettings>;

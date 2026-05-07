@@ -1,6 +1,6 @@
 "use client";
 
-import { loadBuiltinPalette } from "@artmapify/core";
+import { DEFAULT_SUFFIX_TEMPLATE, loadBuiltinPalette } from "@artmapify/core";
 import { ChevronDown, Loader2, SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -79,6 +79,12 @@ export default function Home() {
   // PipelineSettings) because they don't affect the rendered tiles.
   const [artmapTitle, setArtmapTitle] = useState("");
   const [artmapArtist, setArtmapArtist] = useState("");
+  // Per-tile suffix template. Default mirrors core's DEFAULT_SUFFIX_TEMPLATE
+  // so the input shows the real default; clearing it ("") disables
+  // suffixing entirely.
+  const [artmapSuffix, setArtmapSuffix] = useState<string>(
+    DEFAULT_SUFFIX_TEMPLATE,
+  );
   // Track whether we've hydrated from cache yet, so the persistence
   // effect below doesn't overwrite the cache with default values
   // immediately after mount.
@@ -93,6 +99,7 @@ export default function Home() {
     if (cached.aspectAuto !== undefined) setAspectAuto(cached.aspectAuto);
     if (cached.artmapTitle !== undefined) setArtmapTitle(cached.artmapTitle);
     if (cached.artmapArtist !== undefined) setArtmapArtist(cached.artmapArtist);
+    if (cached.artmapSuffix !== undefined) setArtmapSuffix(cached.artmapSuffix);
     /* eslint-enable react-hooks/set-state-in-effect */
     hydratedRef.current = true;
   }, []);
@@ -100,8 +107,14 @@ export default function Home() {
   // Persist settings on every change once hydrated.
   useEffect(() => {
     if (!hydratedRef.current) return;
-    saveCachedSettings({ settings, aspectAuto, artmapTitle, artmapArtist });
-  }, [settings, aspectAuto, artmapTitle, artmapArtist]);
+    saveCachedSettings({
+      settings,
+      aspectAuto,
+      artmapTitle,
+      artmapArtist,
+      artmapSuffix,
+    });
+  }, [settings, aspectAuto, artmapTitle, artmapArtist, artmapSuffix]);
 
   // Load palette synchronously from the bundled @artmapify/core copy,
   // then async-load the item textures from /items/.
@@ -393,6 +406,8 @@ export default function Home() {
                     onTitleChange={setArtmapTitle}
                     artist={artmapArtist}
                     onArtistChange={setArtmapArtist}
+                    suffixTemplate={artmapSuffix}
+                    onSuffixTemplateChange={setArtmapSuffix}
                   />
                 </section>
 
@@ -412,6 +427,7 @@ export default function Home() {
                       fileName={file.name}
                       artmapTitle={artmapTitle}
                       artmapArtist={artmapArtist}
+                      artmapSuffix={artmapSuffix}
                     />
                   ) : null}
                 </section>

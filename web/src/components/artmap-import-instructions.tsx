@@ -72,11 +72,12 @@ export function ArtMapImportInstructions({
           <li>
             ArtMap will print&nbsp;
             <span className="italic">N artworks available for import</span> and
-            register each tile under its own title (for grids the suffix is{" "}
+            register each tile under its own title (for grids the default suffix
+            is{" "}
             <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">
-              _R&lt;row&gt;C&lt;col&gt;
+              R&lt;row&gt;C&lt;col&gt;
             </code>
-            ).
+            , space-separated).
           </li>
           <li>
             Find your tiles via{" "}

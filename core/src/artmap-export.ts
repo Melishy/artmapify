@@ -40,8 +40,8 @@ export interface ArtMapTileExport {
 
 export interface ExportArtMapOptions {
   /**
-   * Title used for single-tile exports. For multi-tile grids we append
-   * row/column suffixes; see `multiTileTitle` below.
+   * Title used as the base for every tile. Multi-tile grids append the
+   * resolved `suffixTemplate` after this base.
    */
   title: string;
   /** Player UUID. See file-level docstring for the format. */
@@ -51,9 +51,23 @@ export interface ExportArtMapOptions {
    */
   date?: string;
   /**
-   * Optional override for the per-tile title in multi-tile exports.
-   * Receives (baseTitle, gx, gy, total) and must return a 3..16 char
-   * string. The default produces "<title>_R<gy>C<gx>" truncated to 16.
+   * Per-tile suffix appended to `title` for multi-tile grids. Supports
+   * three placeholders:
+   *
+   *   {row}    1-based grid row    (1..gridH)
+   *   {col}    1-based grid column (1..gridW)
+   *   {count}  1-based row-major tile index (1..gridW*gridH)
+   *
+   * Defaults to `_R{row}C{col}`. Pass an empty string to disable
+   * appending (the base title is used verbatim for every tile, which
+   * only makes sense for 1x1 grids; the server will append `_1` etc.
+   * for collisions).
+   */
+  suffixTemplate?: string;
+  /**
+   * Power-user escape hatch: full control over the per-tile title.
+   * Wins over `suffixTemplate` when set. Must return a 3..16 char
+   * string; the caller is responsible for length budgeting.
    */
   multiTileTitle?: (
     baseTitle: string,
@@ -66,6 +80,42 @@ export interface ExportArtMapOptions {
 
 const ARTMAP_MIN_TITLE = 3;
 const ARTMAP_MAX_TITLE = 16;
+// Space-separated by default ("Art R1C1") since ArtMap accepts spaces in
+// titles and it reads more naturally than underscore-glued. Power users
+// can override via opts.suffixTemplate (e.g. "_R{row}C{col}", " #{count}").
+export const DEFAULT_SUFFIX_TEMPLATE = " R{row}C{col}";
+
+/**
+ * Substitute {row}, {col}, {count} in a suffix template. Unknown
+ * placeholders are left intact so users can include literal braces
+ * by mistake without producing surprising output.
+ */
+function renderSuffix(
+  template: string,
+  row: number,
+  col: number,
+  count: number,
+): string {
+  return template
+    .replace(/\{row\}/g, String(row))
+    .replace(/\{col\}/g, String(col))
+    .replace(/\{count\}/g, String(count));
+}
+
+/**
+ * Worst-case rendered length of a suffix template for a given grid.
+ * Used to reserve room when truncating long base titles.
+ */
+function maxSuffixLength(
+  template: string,
+  gridW: number,
+  gridH: number,
+): number {
+  if (template === "") return 0;
+  const total = gridW * gridH;
+  // Pessimistically use the largest possible value of each placeholder.
+  return renderSuffix(template, gridH, gridW, total).length;
+}
 
 /** Format today's date as DD-MM-YYYY (UTC). */
 export function todayDDMMYYYY(): string {
@@ -232,11 +282,26 @@ export function exportArtMap(
   opts: ExportArtMapOptions,
 ): ArtMapTileExport[] {
   const date = opts.date ?? todayDDMMYYYY();
+  // suffixTemplate="" means "no suffix". undefined falls back to default.
+  const template = opts.suffixTemplate ?? DEFAULT_SUFFIX_TEMPLATE;
+  // Reserve room for the longest rendered suffix in this grid so the
+  // base title doesn't eat the suffix when it gets truncated to 16 chars.
+  const suffixLen = maxSuffixLength(template, gridW, gridH);
+  const baseRoom = Math.max(ARTMAP_MIN_TITLE, ARTMAP_MAX_TITLE - suffixLen);
+  const trimmedBase = opts.title.trim().slice(0, baseRoom);
+  const single = tiles.length === 1;
+
+  // Default titler reads from the resolved template; power users can pass
+  // their own multiTileTitle to override entirely.
   const titler =
     opts.multiTileTitle ??
-    ((base: string, gx: number, gy: number) =>
-      clampTitle(`${base}_R${gy}C${gx}`));
-  const single = tiles.length === 1;
+    ((_base: string, gx: number, gy: number, gw: number) => {
+      if (template === "") return clampTitle(trimmedBase);
+      const count = (gy - 1) * gw + gx;
+      return clampTitle(
+        `${trimmedBase}${renderSuffix(template, gy, gx, count)}`,
+      );
+    });
   return tiles.map((tile) => {
     const title = single
       ? clampTitle(opts.title)
