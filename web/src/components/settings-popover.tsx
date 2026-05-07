@@ -51,6 +51,7 @@ export function SettingsPopover(props: Props) {
         window.clearTimeout(exitTimer.current);
         exitTimer.current = null;
       }
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMounted(true);
       // Schedule the "in" phase on the next frame so the browser
       // commits the initial styles first.

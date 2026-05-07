@@ -87,11 +87,13 @@ export default function Home() {
   // Hydrate persisted state from localStorage after mount.
   useEffect(() => {
     const cached = loadCachedSettings();
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (cached.settings)
       setSettings({ ...DEFAULT_SETTINGS, ...cached.settings });
     if (cached.aspectAuto !== undefined) setAspectAuto(cached.aspectAuto);
     if (cached.artmapTitle !== undefined) setArtmapTitle(cached.artmapTitle);
     if (cached.artmapArtist !== undefined) setArtmapArtist(cached.artmapArtist);
+    /* eslint-enable react-hooks/set-state-in-effect */
     hydratedRef.current = true;
   }, []);
 
@@ -107,6 +109,7 @@ export default function Home() {
     let cancelled = false;
     try {
       const p = loadBuiltinPalette();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPalette(p);
       (async () => {
         try {
@@ -190,10 +193,12 @@ export default function Home() {
   // a monotonic seq counter rather than terminating the worker.
   const runSeq = useRef(0);
   const clientRef = useRef<PipelineClient | null>(null);
-  if (!clientRef.current) clientRef.current = new PipelineClient();
+  // Spawn the worker on mount, terminate on unmount. Effects below read
+  // clientRef.current; if it ever sees null they early-return (the very
+  // first paint runs before this effect, so that's a normal state).
   useEffect(() => {
+    clientRef.current = new PipelineClient();
     return () => {
-      // Hard-stop the worker on unmount so it doesn't leak.
       clientRef.current?.terminate();
       clientRef.current = null;
     };
@@ -373,8 +378,8 @@ export default function Home() {
                     <h2 className="text-sm font-semibold">ArtMap import</h2>
                     <p className="text-muted-foreground text-xs">
                       Skip the painting step entirely. Generates a JSON file you
-                      drop into your ArtMap server's plugin folder and import
-                      with{" "}
+                      drop into your ArtMap server&apos;s plugin folder and
+                      import with{" "}
                       <code className="bg-background rounded px-1 py-0.5 font-mono text-[10px]">
                         /art import
                       </code>
