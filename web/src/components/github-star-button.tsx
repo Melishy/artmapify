@@ -30,6 +30,7 @@ export function GitHubStarButton({ owner, repo, label = "Star" }: Props) {
   useEffect(() => {
     const cached = readCachedStars(cacheKey);
     if (cached !== null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStars(cached);
       return;
     }
