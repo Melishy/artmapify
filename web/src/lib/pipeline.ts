@@ -1,19 +1,9 @@
 // Top-level pipeline: Blob + settings -> preview canvas + tiles + summary.
 // Handles the aspect=auto rescaling from the CLI as well.
 
-import { clickCost } from "./palette";
-import {
-  decodeBlob,
-  prepareImage,
-  quantize,
-  splitIntoTiles,
-} from "./image";
-import type {
-  Palette,
-  PaletteEntry,
-  PipelineSettings,
-  Tile,
-} from "./types";
+import { clickCost, quantize, splitIntoTiles } from "@artmapify/core";
+import { decodeBlob, prepareImage } from "./image";
+import type { Palette, PaletteEntry, PipelineSettings, Tile } from "./types";
 
 export interface DyeCount {
   label: string;
@@ -169,10 +159,7 @@ function buildSummary(
 
   const sorted = [...byLabel.values()].sort((a, b) => b.count - a.count);
   const totalCells =
-    settings.gridW *
-    settings.gridH *
-    settings.tileSize *
-    settings.tileSize;
+    settings.gridW * settings.gridH * settings.tileSize * settings.tileSize;
   return {
     gridW: settings.gridW,
     gridH: settings.gridH,

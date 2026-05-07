@@ -1,66 +1,29 @@
-// Shared types for the browser port of ArtMapify.
-// Keep in sync with root src/palette.ts, src/image.ts, src/render.ts.
+// Re-exports shared types from @artmapify/core so existing imports from
+// "@/lib/types" keep working. Web-only types (DOM-flavored RenderOptions,
+// orchestration PipelineSettings) live below.
 
-export type RGB = readonly [number, number, number];
+export type {
+  Adjustments,
+  Cell,
+  ColorMetric,
+  DitherMethod,
+  FitMode,
+  Palette,
+  PaletteEntry,
+  RawImage,
+  RGB,
+  Tile,
+} from "@artmapify/core";
+export { DEFAULT_ADJUSTMENTS } from "@artmapify/core";
 
-export interface PaletteEntry {
-  label: string;
-  base: string;
-  name: string;
-  shade: 0 | 1 | 2 | 3;
-  rgb: RGB;
-}
+import type {
+  Adjustments,
+  ColorMetric,
+  DitherMethod,
+  FitMode,
+} from "@artmapify/core";
 
-export interface Palette {
-  entries: PaletteEntry[];
-  byLabel: Map<string, PaletteEntry>;
-  byRgb: Map<number, PaletteEntry>;
-}
-
-export type ColorMetric = "luma-hue" | "redmean" | "rgb";
-
-export type DitherMethod =
-  | "none"
-  | "floyd-steinberg"
-  | "burkes"
-  | "sierra-lite";
-
-export type FitMode = "contain" | "cover" | "fill";
-
-export interface Adjustments {
-  brightness: number;
-  contrast: number;
-  saturation: number;
-  sharpness: number;
-  filter: "none" | "grayscale" | "sepia";
-}
-
-export const DEFAULT_ADJUSTMENTS: Adjustments = {
-  brightness: 1,
-  contrast: 1,
-  saturation: 1,
-  sharpness: 1,
-  filter: "none",
-};
-
-export interface Cell {
-  x: number;
-  y: number;
-  entry: PaletteEntry;
-}
-
-export interface Tile {
-  gx: number;
-  gy: number;
-  cells: PaletteEntry[];
-}
-
-export interface RawImage {
-  data: Uint8ClampedArray;
-  width: number;
-  height: number;
-}
-
+/** Browser-flavored render options (canvas-bound texture map). */
 export interface RenderOptions {
   cellSize: number;
   /** Map of item base name -> HTMLImageElement | ImageBitmap for textures. */

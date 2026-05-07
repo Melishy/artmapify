@@ -40,7 +40,7 @@ jobs:
         run: npm run build
 
       - name: Smoke test (CLI help)
-        run: node dist/cli.js --help
+        run: node cli/dist/cli.js --help
   web:
     name: Web build (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
@@ -48,10 +48,6 @@ jobs:
       fail-fast: false
       matrix:
         node: [20, 22]
-
-    defaults:
-      run:
-        working-directory: web
 
     steps:
       - name: Checkout
@@ -62,16 +58,18 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-          cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Build core
+        run: npm run build:core
+
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npm run typecheck --workspace web
 
       - name: Lint
-        run: npm run lint
+        run: npm run lint --workspace web
 
-      - name: Build
-        run: npm run build
+      - name: Build web
+        run: npm run build:web

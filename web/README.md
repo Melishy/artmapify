@@ -35,9 +35,9 @@ npm start
 
 ## Assets
 
-- `public/palette.csv` is a copy of the repo-root palette.
+- The palette is bundled directly into `@artmapify/core`; the web app imports it as a string and parses at startup, so there's no runtime fetch.
 - `public/items/*.png` are the Minecraft item textures. Keep them in sync with the root `items/` folder (use `npm run fetch-textures` at the repo root, then copy into `web/public/items/`).
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+  This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
 

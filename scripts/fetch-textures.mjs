@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 /**
- * Downloads Minecraft item/block textures from InventivetalentDev/minecraft-assets
- * (a mirror of Mojang assets) for every entry in palette.csv.
+ * Downloads Minecraft item/block textures from misode/mcmeta
+ * (https://github.com/misode/mcmeta), an auto-updated mirror of Mojang's
+ * assets and data, for every entry in palette.csv.
  *
  * Output: ./items/<normalized_name>.png
  *   where <normalized_name> matches the palette CSV "Item" column, lowercased,
  *   with whitespace replaced by underscores.
  *
  * Usage:
- *   node scripts/fetch-textures.mjs
- *   node scripts/fetch-textures.mjs --version 1.20.4
- *   node scripts/fetch-textures.mjs --palette palette.csv --out items
+ *   node scripts/fetch-textures.mjs                 (latest snapshot)
+ *   node scripts/fetch-textures.mjs --version 1.21.4  (pin to a release)
+ *   node scripts/fetch-textures.mjs --palette core/palette.csv --out items
  *
  * Requires Node.js >= 20 (uses global fetch).
  */
@@ -175,8 +176,13 @@ const yellow = (s) => color("33", s);
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const version = args.version ?? "1.20.4";
-  const paletteCsv = args.palette ?? "palette.csv";
+  // misode/mcmeta tracks the latest snapshot on the `assets-tiny` branch
+  // and tags each release as `<version>-assets-tiny`. We default to the
+  // branch (always fresh) and let --version pin to a specific release.
+  const ref = args.version ? `${args.version}-assets-tiny` : "assets-tiny";
+  // Default to the monorepo's canonical palette location. Override with
+  // --palette if you've moved it.
+  const paletteCsv = args.palette ?? "core/palette.csv";
   const outDir = args.out ?? "items";
 
   if (!(await exists(paletteCsv))) {
@@ -211,7 +217,7 @@ async function main() {
     .filter((v) => v.length > 0)
     .map(normalizeItemName);
 
-  const baseUrl = `https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/${version}/assets/minecraft/textures`;
+  const baseUrl = `https://raw.githubusercontent.com/misode/mcmeta/${ref}/assets/minecraft/textures`;
 
   let ok = 0;
   let fail = 0;

@@ -1,8 +1,7 @@
 import sharp from "sharp";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type { PaletteEntry } from "./palette.js";
-import type { Tile } from "./image.js";
+import type { PaletteEntry, Tile } from "@artmapify/core";
 
 /**
  * 5x7 pixel glyphs for digits 0..9. Each inner string row is 5 chars wide,

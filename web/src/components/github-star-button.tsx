@@ -21,12 +21,18 @@ interface CachedStars {
 export function GitHubStarButton({ owner, repo, label = "Star" }: Props) {
   const href = `https://github.com/${owner}/${repo}`;
   const cacheKey = `${CACHE_KEY_PREFIX}${owner}/${repo}`;
-  // Read any fresh cached value during the initial render so we don't trigger
-  // a second render just to display a value we already had.
-  const [stars, setStars] = useState<number | null>(() => readCachedStars(cacheKey));
+  // Always start at null so the SSR HTML matches the first client render
+  // (sessionStorage is browser-only). The cache is consulted in an effect
+  // below; if a hit lands the value updates after hydration with no
+  // mismatch.
+  const [stars, setStars] = useState<number | null>(null);
 
   useEffect(() => {
-    if (stars !== null) return;
+    const cached = readCachedStars(cacheKey);
+    if (cached !== null) {
+      setStars(cached);
+      return;
+    }
     let cancelled = false;
     fetch(`https://api.github.com/repos/${owner}/${repo}`, {
       headers: { Accept: "application/vnd.github+json" },
@@ -41,7 +47,10 @@ export function GitHubStarButton({ owner, repo, label = "Star" }: Props) {
         try {
           sessionStorage.setItem(
             cacheKey,
-            JSON.stringify({ count, fetchedAt: Date.now() } satisfies CachedStars),
+            JSON.stringify({
+              count,
+              fetchedAt: Date.now(),
+            } satisfies CachedStars),
           );
         } catch {
           // Ignore storage failures.
@@ -54,7 +63,7 @@ export function GitHubStarButton({ owner, repo, label = "Star" }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, cacheKey, stars]);
+  }, [owner, repo, cacheKey]);
 
   return (
     <a
@@ -65,7 +74,7 @@ export function GitHubStarButton({ owner, repo, label = "Star" }: Props) {
     >
       <GitHubMark className="size-3.5" aria-hidden />
       <span>{label}</span>
-      <span className="flex items-center gap-0.5 text-muted-foreground">
+      <span className="text-muted-foreground flex items-center gap-0.5">
         <Star className="size-3" aria-hidden />
         <span className="tabular-nums">{formatCount(stars)}</span>
       </span>
@@ -92,10 +101,7 @@ function readCachedStars(cacheKey: string): number | null {
   return null;
 }
 
-function GitHubMark({
-  className,
-  ...rest
-}: React.SVGProps<SVGSVGElement>) {
+function GitHubMark({ className, ...rest }: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       viewBox="0 0 24 24"

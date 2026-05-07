@@ -14,7 +14,7 @@ body:
       label: What happened?
       description: What did you expect, and what did you see instead?
       placeholder: |
-        I ran `npx tsx src/cli.ts myart.png --width 3 --height 3 --guide`
+        I ran `npm run dev:cli -- myart.png --width 3 --height 3 --guide`
         and expected a 3x3 canvas, but got ...
     validations:
       required: true
@@ -25,7 +25,7 @@ body:
       label: Steps to reproduce
       description: The exact command(s), and any relevant flags. If a specific input image is needed, mention its size and format.
       placeholder: |
-        1. `npx tsx src/cli.ts photo.jpg --dither floyd-steinberg --click-bias 12 --guide`
+        1. `npm run dev:cli -- photo.jpg --dither floyd-steinberg --click-bias 12 --guide`
         2. Open `out/preview.png`
         3. ...
     validations:

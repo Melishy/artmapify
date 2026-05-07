@@ -2,6 +2,7 @@
 
 import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { buildArtMapJson } from "@/components/artmap-export";
 import { Button } from "@/components/ui/button";
 import type { PipelineResult } from "@/lib/pipeline";
 import {
@@ -11,14 +12,25 @@ import {
   renderTileCanvas,
 } from "@/lib/render";
 import type { RenderOptions } from "@/lib/types";
+import { fileBaseName } from "@/lib/utils";
 
 interface Props {
   result: PipelineResult;
   itemTextures: Map<string, ImageBitmap>;
   fileName: string;
+  /** Title for the bundled ArtMap export. Empty = skip the JSON. */
+  artmapTitle: string;
+  /** Artist UUID or name. Empty = random UUID, but only used when title is set. */
+  artmapArtist: string;
 }
 
-export function DownloadZip({ result, itemTextures, fileName }: Props) {
+export function DownloadZip({
+  result,
+  itemTextures,
+  fileName,
+  artmapTitle,
+  artmapArtist,
+}: Props) {
   const [busy, setBusy] = useState(false);
 
   const onClick = async () => {
@@ -88,11 +100,22 @@ export function DownloadZip({ result, itemTextures, fileName }: Props) {
       };
       zip.file("summary.json", JSON.stringify(summaryJson, null, 2));
 
+      // ArtMap import JSON (only when the user filled in a title).
+      if (artmapTitle.trim()) {
+        const artmapJson = await buildArtMapJson(
+          result,
+          fileName,
+          artmapTitle,
+          artmapArtist,
+        );
+        zip.file("artmap.json", artmapJson);
+      }
+
       const blob = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${baseName(fileName)}-artmapify.zip`;
+      a.download = `${fileBaseName(fileName, "artmapify")}-artmapify.zip`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -108,9 +131,4 @@ export function DownloadZip({ result, itemTextures, fileName }: Props) {
       Download zip
     </Button>
   );
-}
-
-function baseName(path: string): string {
-  const noExt = path.replace(/\.[^.]+$/, "");
-  return noExt.replace(/[^a-z0-9_-]+/gi, "_") || "artmapify";
 }

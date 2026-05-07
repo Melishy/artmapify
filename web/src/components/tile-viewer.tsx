@@ -64,14 +64,13 @@ export function TileViewer({ tiles, settings, itemTextures }: Props) {
   );
 
   const fullCanvas = useDeferredValue(
-    () =>
-      tile ? renderTileCanvas(tile, settings.tileSize, fullOpts) : null,
+    () => (tile ? renderTileCanvas(tile, settings.tileSize, fullOpts) : null),
     [tile, settings.tileSize, fullOpts],
   );
 
   if (!tile) {
     return (
-      <div className="text-sm text-muted-foreground">No tiles to show.</div>
+      <div className="text-muted-foreground text-sm">No tiles to show.</div>
     );
   }
 
@@ -92,12 +91,12 @@ export function TileViewer({ tiles, settings, itemTextures }: Props) {
               <span className="font-semibold text-amber-950 dark:text-amber-50">
                 {total} map{total === 1 ? "" : "s"}
               </span>{" "}
-              (128 x 128 pixels each). Use the thumbnails below to jump to
-              the map you are currently painting.
+              (128 x 128 pixels each). Use the thumbnails below to jump to the
+              map you are currently painting.
             </li>
             <li>
-              Numbers on the rulers are the pixel coordinates inside that
-              map. The digit in each cell is the shade you need:
+              Numbers on the rulers are the pixel coordinates inside that map.
+              The digit in each cell is the shade you need:
             </li>
           </ul>
           <ul className="mt-2 space-y-1 pl-5">
@@ -132,7 +131,7 @@ export function TileViewer({ tiles, settings, itemTextures }: Props) {
           </ul>
         </AlertDescription>
       </Alert>
-      <div className="relative flex min-h-40 items-center justify-center overflow-auto rounded-md border bg-background p-4">
+      <div className="bg-background relative flex min-h-40 items-center justify-center overflow-auto rounded-md border p-4">
         {fullCanvas ? (
           <CanvasView
             source={fullCanvas}
@@ -140,7 +139,7 @@ export function TileViewer({ tiles, settings, itemTextures }: Props) {
             alt={`Tile ${tile.gx},${tile.gy}`}
           />
         ) : (
-          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+          <div className="text-muted-foreground flex h-40 items-center justify-center text-sm">
             <Loader2 className="mr-2 size-4 animate-spin" />
             Rendering guide
           </div>
@@ -173,7 +172,7 @@ export function TileViewer({ tiles, settings, itemTextures }: Props) {
         })}
       </div>
       {thumbs.filter(Boolean).length !== tiles.length ? (
-        <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <div className="text-muted-foreground inline-flex items-center gap-1 text-xs">
           <Loader2 className="size-3 animate-spin" />
           Rendering thumbnails ({thumbs.filter(Boolean).length}/{tiles.length})
         </div>
@@ -229,8 +228,8 @@ function ThumbPlaceholder({
       onClick={onClick}
       aria-label={`Tile ${label}`}
     >
-      <div className="flex aspect-square w-full items-center justify-center rounded-sm bg-muted">
-        <Loader2 className="size-3 animate-spin text-muted-foreground" />
+      <div className="bg-muted flex aspect-square w-full items-center justify-center rounded-sm">
+        <Loader2 className="text-muted-foreground size-3 animate-spin" />
       </div>
       <span className="text-[10px] leading-none">{label}</span>
     </Button>

@@ -6,25 +6,29 @@
   "license": "MIT",
   "author": "melishy",
   "type": "module",
+  "packageManager": "npm@11.10.1",
   "engines": {
     "node": ">=20"
   },
-  "bin": {
-    "artmapify": "dist/cli.js"
-  },
+  "workspaces": [
+    "core",
+    "cli",
+    "web"
+  ],
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/cli.js",
-    "dev": "tsx src/cli.ts",
-    "typecheck": "tsc --noEmit",
+    "build": "npm run build:core && npm run build:cli && npm run build:web",
+    "build:core": "npm run build --workspace @artmapify/core",
+    "build:cli": "npm run build --workspace artmapify",
+    "build:web": "npm run build --workspace web",
+    "dev:cli": "npm run dev --workspace artmapify",
+    "dev:web": "npm run dev --workspace web",
+    "typecheck": "npm run build:core && npm run typecheck --workspaces --if-present",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,json,md,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,json,md,css}\"",
     "fetch-textures": "node scripts/fetch-textures.mjs"
   },
-  "dependencies": {
-    "sharp": "^0.34.5"
-  },
   "devDependencies": {
-    "@types/node": "^25.6.0",
-    "tsx": "^4.19.1",
-    "typescript": "^6.0.3"
+    "prettier": "^3.8.3",
+    "prettier-plugin-tailwindcss": "^0.8.0"
   }
 }

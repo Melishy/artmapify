@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageIcon, Upload } from "lucide-react";
+import { Clipboard, ImageIcon, Upload, X } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { Button } from "@/components/ui/button";
+import { useClipboardImage } from "@/lib/use-clipboard-image";
 import { cn } from "@/lib/utils";
 
 type PickFile = (file: File) => void;
@@ -62,7 +63,7 @@ export function DropTarget({
     <div
       className={cn(
         "flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-10 text-center transition-colors",
-        "cursor-pointer hover:bg-muted/40",
+        "hover:bg-muted/40 cursor-pointer",
         dragging ? "border-primary bg-muted" : "",
         className,
       )}
@@ -85,10 +86,10 @@ export function DropTarget({
       aria-label="Choose an image"
     >
       {input}
-      <Upload className="size-8 text-muted-foreground" />
+      <Upload className="text-muted-foreground size-8" />
       <div>
         <div className="font-medium">Drop an image to get started</div>
-        <div className="text-sm text-muted-foreground">
+        <div className="text-muted-foreground text-sm">
           or click to browse (PNG, JPG, WebP, ...)
         </div>
       </div>
@@ -98,14 +99,18 @@ export function DropTarget({
 
 /**
  * Compact source chip for the toolbar: shows a thumbnail and filename, clicks
- * to replace. Also accepts drag-drops.
+ * to replace. Also accepts drag-drops and exposes an inline clear (×)
+ * button.
  */
 export function SourceChip({
   onFile,
+  onClear,
   file,
   dimensions,
 }: {
   onFile: PickFile;
+  /** Called when the user clicks the × button. */
+  onClear?: () => void;
   file: File;
   dimensions?: { w: number; h: number } | null;
 }) {
@@ -121,9 +126,7 @@ export function SourceChip({
   }, [file]);
 
   return (
-    <button
-      type="button"
-      onClick={pick}
+    <div
       onDragOver={(e) => {
         e.preventDefault();
         setDragging(true);
@@ -135,43 +138,71 @@ export function SourceChip({
         handleFile(e.dataTransfer.files?.[0] ?? null);
       }}
       className={cn(
-        "group flex h-9 items-center gap-2 rounded-md border bg-background px-2 py-1 text-left text-xs transition-colors hover:bg-muted",
+        "group bg-background flex h-9 items-center gap-1 rounded-md border pr-1 pl-1 text-left text-xs transition-colors",
         dragging ? "border-primary bg-muted" : "",
       )}
-      aria-label={`Replace ${file.name}`}
-      title="Click or drop to replace"
     >
       {input}
-      <span className="relative block size-6 shrink-0 overflow-hidden rounded-sm bg-muted">
-        {previewUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={previewUrl}
-            alt=""
-            className="h-full w-full object-cover"
-            style={{ imageRendering: "pixelated" }}
-          />
-        ) : (
-          <ImageIcon className="absolute inset-1 size-4 text-muted-foreground" />
-        )}
-      </span>
-      <span className="flex min-w-0 flex-col leading-tight">
-        <span className="max-w-[14rem] truncate font-medium">{file.name}</span>
-        {dimensions ? (
-          <span className="text-[10px] text-muted-foreground tabular-nums">
-            {dimensions.w} x {dimensions.h}
+      <button
+        type="button"
+        onClick={pick}
+        className="hover:bg-muted focus-visible:bg-muted -my-px flex h-full min-w-0 items-center gap-2 rounded-sm py-1 pr-1 pl-1 text-left transition-colors focus-visible:outline-none"
+        aria-label={`Replace ${file.name}`}
+        title="Click or drop to replace"
+      >
+        <span className="bg-muted relative block size-6 shrink-0 overflow-hidden rounded-sm">
+          {previewUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={previewUrl}
+              alt=""
+              className="h-full w-full object-cover"
+              style={{ imageRendering: "pixelated" }}
+            />
+          ) : (
+            <ImageIcon className="text-muted-foreground absolute inset-1 size-4" />
+          )}
+        </span>
+        <span className="flex min-w-0 flex-col leading-tight">
+          <span className="max-w-[14rem] truncate font-medium">
+            {file.name}
           </span>
-        ) : null}
-      </span>
-    </button>
+          {dimensions ? (
+            <span className="text-muted-foreground text-[10px] tabular-nums">
+              {dimensions.w} x {dimensions.h}
+            </span>
+          ) : null}
+        </span>
+      </button>
+      {onClear ? (
+        <button
+          type="button"
+          onClick={onClear}
+          aria-label="Clear image"
+          title="Clear image"
+          className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded transition-colors focus-visible:outline-none"
+        >
+          <X className="size-3.5" />
+        </button>
+      ) : null}
+    </div>
   );
 }
 
 /**
- * "Choose file" button for when there's no file yet, used in the toolbar.
+ * "Choose file" + "Paste" buttons for when there's no file yet, used in
+ * the toolbar. Also wires up document-level Ctrl+V paste so the user can
+ * paste from anywhere on the page.
  */
 export function SourceButton({ onFile }: { onFile: PickFile }): ReactNode {
   const { input, pick } = useFilePicker(onFile);
+  const handleImage = useCallback(
+    (f: File) => {
+      if (f.type.startsWith("image/")) onFile(f);
+    },
+    [onFile],
+  );
+  const { paste, error, clearError } = useClipboardImage(handleImage);
   return (
     <>
       {input}
@@ -179,6 +210,23 @@ export function SourceButton({ onFile }: { onFile: PickFile }): ReactNode {
         <Upload />
         Choose image
       </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => {
+          clearError();
+          void paste();
+        }}
+        title="Paste an image from clipboard (Ctrl+V works anywhere on the page)"
+      >
+        <Clipboard />
+        Paste
+      </Button>
+      {error ? (
+        <span className="text-destructive text-[10px]" role="alert">
+          {error}
+        </span>
+      ) : null}
     </>
   );
 }
