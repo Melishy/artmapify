@@ -24,6 +24,7 @@ export { quantize, splitIntoTiles } from "./quantize.ts";
 export { resolveAspect, type AspectAutoResult } from "./aspect.ts";
 export { BUILTIN_PALETTE_CSV } from "./palette-data.ts";
 export {
+  DEFAULT_SUFFIX_TEMPLATE,
   exportArtMap,
   exportArtMapTile,
   isUuid,

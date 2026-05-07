@@ -2,7 +2,7 @@
 
 import { Download, Info, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { exportArtMap, isUuid } from "@artmapify/core";
+import { DEFAULT_SUFFIX_TEMPLATE, exportArtMap, isUuid } from "@artmapify/core";
 import { ArtMapImportInstructions } from "@/components/artmap-import-instructions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,12 @@ interface Props {
   /** Artist (UUID or player name) bound to page-level state. */
   artist: string;
   onArtistChange: (next: string) => void;
+  /**
+   * Per-tile suffix template. Empty string disables the suffix.
+   * Supports {row}, {col}, {count} placeholders.
+   */
+  suffixTemplate: string;
+  onSuffixTemplateChange: (next: string) => void;
 }
 
 /**
@@ -28,17 +34,32 @@ interface Props {
  * and web ports produce byte-identical rows.
  */
 export function ArtMapExport(props: Props) {
-  const { result, fileName, title, onTitleChange, artist, onArtistChange } =
-    props;
+  const {
+    result,
+    fileName,
+    title,
+    onTitleChange,
+    artist,
+    onArtistChange,
+    suffixTemplate,
+    onSuffixTemplateChange,
+  } = props;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showInstructions, setShowInstructions] = useState(false);
+  const isMultiTile = result.settings.gridW * result.settings.gridH > 1;
 
   const onClick = async () => {
     setBusy(true);
     setError(null);
     try {
-      const json = await buildArtMapJson(result, fileName, title, artist);
+      const json = await buildArtMapJson(
+        result,
+        fileName,
+        title,
+        artist,
+        suffixTemplate,
+      );
       const blob = new Blob([json], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -70,8 +91,7 @@ export function ArtMapExport(props: Props) {
             maxLength={16}
           />
           <p className="text-muted-foreground text-[10px]">
-            3-16 chars. Multi-tile grids get an _R&lt;row&gt;C&lt;col&gt;
-            suffix.
+            3-16 chars. Multi-tile grids append the suffix below.
           </p>
         </div>
         <div className="space-y-1">
@@ -86,6 +106,32 @@ export function ArtMapExport(props: Props) {
           />
           <p className="text-muted-foreground text-[10px]">
             Names get the offline-mode UUID Bukkit assigns. Empty = random.
+          </p>
+        </div>
+        <div className="space-y-1 sm:col-span-2">
+          <Label htmlFor="artmap-suffix" className="text-xs">
+            Per-tile suffix
+          </Label>
+          <Input
+            id="artmap-suffix"
+            value={suffixTemplate}
+            onChange={(e) => onSuffixTemplateChange(e.target.value)}
+            placeholder={DEFAULT_SUFFIX_TEMPLATE}
+            disabled={!isMultiTile}
+          />
+          <p className="text-muted-foreground text-[10px]">
+            Placeholders:{" "}
+            <code className="bg-muted rounded px-1 py-0.5 font-mono">
+              {"{row}"}
+            </code>{" "}
+            <code className="bg-muted rounded px-1 py-0.5 font-mono">
+              {"{col}"}
+            </code>{" "}
+            <code className="bg-muted rounded px-1 py-0.5 font-mono">
+              {"{count}"}
+            </code>
+            . Leave empty for no suffix (only useful on 1×1 grids).
+            {!isMultiTile && " Disabled because the grid is 1x1."}
           </p>
         </div>
       </div>
@@ -126,6 +172,7 @@ export async function buildArtMapJson(
   fileName: string,
   title: string,
   artist: string,
+  suffixTemplate: string,
 ): Promise<string> {
   const resolvedTitle = title.trim() || fileBaseName(fileName) || "Untitled";
   const resolvedArtist = await resolveArtist(artist);
@@ -137,7 +184,8 @@ export async function buildArtMapJson(
     {
       title: resolvedTitle,
       artist: resolvedArtist,
-      // Defaults to today's date in @artmapify/core.
+      suffixTemplate,
+      // Date defaults to today in @artmapify/core.
     },
   );
   return JSON.stringify(rows, null, 2);
