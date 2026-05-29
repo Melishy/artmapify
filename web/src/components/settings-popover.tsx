@@ -3,6 +3,8 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ControlsPanel } from "@/components/controls-panel";
+import { GitHubStarButton } from "@/components/github-star-button";
+import { KoFiButton } from "@/components/ko-fi-button";
 import { Button } from "@/components/ui/button";
 import type { PipelineSettings } from "@/lib/types";
 
@@ -116,16 +118,27 @@ export function SettingsPopover(props: Props) {
           maxHeight: "calc(100vh - 96px)",
         }}
       >
-        <div className="flex items-center justify-between border-b px-4 py-2.5">
+        <div className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
           <h2 className="text-sm font-semibold">Settings</h2>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={onClose}
-            aria-label="Close settings"
-          >
-            <X />
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Mirror of the topbar links. They show here only at the widths
+             * where the toolbar hides them, so the actions stay reachable:
+             * Ko-fi under 400px, GitHub under 480px. */}
+            <span className="inline-flex min-[400px]:hidden">
+              <KoFiButton username="melishy" />
+            </span>
+            <span className="inline-flex min-[480px]:hidden">
+              <GitHubStarButton owner="Melishy" repo="artmapify" />
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={onClose}
+              aria-label="Close settings"
+            >
+              <X />
+            </Button>
+          </div>
         </div>
         <div
           className="overflow-y-auto px-4 py-4"

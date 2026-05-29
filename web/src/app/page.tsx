@@ -261,8 +261,8 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="bg-background/95 sticky top-0 z-30 border-b backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 py-2">
-          <div className="mr-2 flex items-center gap-2">
+        <div className="mx-auto flex max-w-7xl flex-nowrap items-center gap-2 px-4 py-2">
+          <div className="mr-2 flex shrink-0 items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={withBasePath("/artmapify.ico")}
@@ -277,7 +277,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="flex flex-1 flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-1 shrink items-center gap-2">
             {file ? (
               <SourceChip
                 onFile={handlePickFile}
@@ -291,16 +291,18 @@ export default function Home() {
             {outputStatus}
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Button
               variant={settingsOpen ? "default" : "outline"}
               size="sm"
               onClick={() => setSettingsOpen((o) => !o)}
               aria-expanded={settingsOpen}
               aria-controls="settings-panel"
+              title="Settings"
+              aria-label="Settings"
             >
               <SlidersHorizontal />
-              Settings
+              <span className="hidden lg:inline">Settings</span>
               <ChevronDown
                 className={cn(
                   "transition-transform",
@@ -308,8 +310,15 @@ export default function Home() {
                 )}
               />
             </Button>
-            <KoFiButton username="melishy" />
-            <GitHubStarButton owner="Melishy" repo="artmapify" />
+            {/* Non-essential links collapse first on tiny screens: Ko-fi
+             * hides below 400px, GitHub below 480px, so the core buttons
+             * always fit without overlapping. */}
+            <span className="hidden min-[400px]:inline-flex">
+              <KoFiButton username="melishy" />
+            </span>
+            <span className="hidden min-[480px]:inline-flex">
+              <GitHubStarButton owner="Melishy" repo="artmapify" />
+            </span>
           </div>
         </div>
       </header>

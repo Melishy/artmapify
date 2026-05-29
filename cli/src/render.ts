@@ -117,10 +117,21 @@ export async function renderTileImage(
   // visually one block. The outer border of the tile is always drawn.
   if (border > 0) {
     const half = Math.floor(border / 2);
+    const white = { r: 255, g: 255, b: 255, alpha: 1 };
     const black = { r: 0, g: 0, b: 0, alpha: 1 };
     const outlineRuns = opts.outlineRuns ?? true;
     const sameRun = (a: PaletteEntry, b: PaletteEntry): boolean =>
       outlineRuns && a.base === b.base && a.shade === b.shade;
+    // Border color adapts to the cells it sits between so it stays visible
+    // on dark dyes (a hardcoded black line vanishes against black/dark
+    // cells). White on dark backgrounds, black on light, by average luma.
+    const luma = (rgb: readonly [number, number, number]): number =>
+      0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
+    const borderBg = (a: PaletteEntry, b: PaletteEntry | null) => {
+      const la = luma(a.rgb);
+      const lb = b ? luma(b.rgb) : la;
+      return (la + lb) / 2 < 128 ? white : black;
+    };
 
     // Vertical segments. For each column seam c in 0..gridSize, and each row
     // r, draw a border-by-cellSize strip unless it's an interior seam
@@ -131,18 +142,20 @@ export async function renderTileImage(
       const stripeW = Math.min(border, totalW - left);
       if (stripeW <= 0) continue;
       for (let r = 0; r < gridSize; r++) {
-        if (c > 0 && c < gridSize) {
-          const leftCell = tile.cells[r * gridSize + (c - 1)]!;
-          const rightCell = tile.cells[r * gridSize + c]!;
-          if (sameRun(leftCell, rightCell)) continue;
-        }
+        const leftCell = c > 0 ? tile.cells[r * gridSize + (c - 1)]! : null;
+        const rightCell = c < gridSize ? tile.cells[r * gridSize + c]! : null;
+        if (c > 0 && c < gridSize && sameRun(leftCell!, rightCell!)) continue;
+        const ref = rightCell ?? leftCell!;
         composites.push({
           input: {
             create: {
               width: stripeW,
               height: cellSize,
               channels: 4,
-              background: black,
+              background: borderBg(
+                ref,
+                c > 0 && c < gridSize ? leftCell : null,
+              ),
             },
           },
           top: r * cellSize,
@@ -157,18 +170,17 @@ export async function renderTileImage(
       const stripeH = Math.min(border, totalH - top);
       if (stripeH <= 0) continue;
       for (let c = 0; c < gridSize; c++) {
-        if (r > 0 && r < gridSize) {
-          const topCell = tile.cells[(r - 1) * gridSize + c]!;
-          const botCell = tile.cells[r * gridSize + c]!;
-          if (sameRun(topCell, botCell)) continue;
-        }
+        const topCell = r > 0 ? tile.cells[(r - 1) * gridSize + c]! : null;
+        const botCell = r < gridSize ? tile.cells[r * gridSize + c]! : null;
+        if (r > 0 && r < gridSize && sameRun(topCell!, botCell!)) continue;
+        const ref = botCell ?? topCell!;
         composites.push({
           input: {
             create: {
               width: cellSize,
               height: stripeH,
               channels: 4,
-              background: black,
+              background: borderBg(ref, r > 0 && r < gridSize ? topCell : null),
             },
           },
           top,

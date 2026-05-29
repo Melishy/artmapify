@@ -289,7 +289,17 @@ function drawCellBorders(
   const outlineRuns = opts.outlineRuns ?? true;
   const sameRun = (a: PaletteEntry, b: PaletteEntry): boolean =>
     outlineRuns && a.base === b.base && a.shade === b.shade;
-  ctx.fillStyle = "#000";
+
+  // Border color adapts to the cells it sits between so it stays visible on
+  // dark dyes (a hardcoded black line vanishes against black/dark cells).
+  // We pick black on light backgrounds and white on dark ones, using the
+  // average luminance of the two adjacent cells (or the single edge cell at
+  // the canvas border).
+  const borderColor = (a: PaletteEntry, b: PaletteEntry | null): string => {
+    const la = luma(a.rgb);
+    const lb = b ? luma(b.rgb) : la;
+    return (la + lb) / 2 < 128 ? "#fff" : "#000";
+  };
 
   for (let c = 0; c <= gridSize; c++) {
     const x = c * cellSize;
@@ -297,11 +307,12 @@ function drawCellBorders(
     const stripeW = Math.min(border, totalW - left);
     if (stripeW <= 0) continue;
     for (let r = 0; r < gridSize; r++) {
-      if (c > 0 && c < gridSize) {
-        const leftCell = tile.cells[r * gridSize + (c - 1)]!;
-        const rightCell = tile.cells[r * gridSize + c]!;
-        if (sameRun(leftCell, rightCell)) continue;
-      }
+      const leftCell = c > 0 ? tile.cells[r * gridSize + (c - 1)]! : null;
+      const rightCell = c < gridSize ? tile.cells[r * gridSize + c]! : null;
+      if (c > 0 && c < gridSize && sameRun(leftCell!, rightCell!)) continue;
+      // Reference cell is whichever side exists at the canvas edge.
+      const ref = rightCell ?? leftCell!;
+      ctx.fillStyle = borderColor(ref, c > 0 && c < gridSize ? leftCell : null);
       ctx.fillRect(left, r * cellSize, stripeW, cellSize);
     }
   }
@@ -311,14 +322,19 @@ function drawCellBorders(
     const stripeH = Math.min(border, totalH - top);
     if (stripeH <= 0) continue;
     for (let c = 0; c < gridSize; c++) {
-      if (r > 0 && r < gridSize) {
-        const topCell = tile.cells[(r - 1) * gridSize + c]!;
-        const botCell = tile.cells[r * gridSize + c]!;
-        if (sameRun(topCell, botCell)) continue;
-      }
+      const topCell = r > 0 ? tile.cells[(r - 1) * gridSize + c]! : null;
+      const botCell = r < gridSize ? tile.cells[r * gridSize + c]! : null;
+      if (r > 0 && r < gridSize && sameRun(topCell!, botCell!)) continue;
+      const ref = botCell ?? topCell!;
+      ctx.fillStyle = borderColor(ref, r > 0 && r < gridSize ? topCell : null);
       ctx.fillRect(c * cellSize, top, cellSize, stripeH);
     }
   }
+}
+
+/** Rec. 601 luma of an RGB tuple, 0..255. */
+function luma(rgb: readonly [number, number, number]): number {
+  return 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
 }
 
 /**

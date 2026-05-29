@@ -70,6 +70,16 @@ export function quantize(
   const result: PaletteEntry[] = new Array(w * h);
   const weights = DITHER_WEIGHTS[dither];
 
+  // Match memo. The chosen entry depends only on the effective (matching)
+  // rgb and the reference (pre-dither) rgb; metric/clickBias/palette are
+  // fixed for the whole run. Many images repeat colors heavily (flat art,
+  // skies, logos), so caching the lookup turns duplicate pixels into a Map
+  // hit instead of a full palette scan. The key packs both 24-bit triples
+  // into one number (eff * 2^24 + ref), which stays within Number's safe
+  // integer range. With dither off, eff === ref so this collapses to one
+  // key per distinct source color.
+  const memo = new Map<number, PaletteEntry>();
+
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const idx = (y * w + x) * 3;
@@ -84,15 +94,22 @@ export function quantize(
       const refR = orig[idx]!;
       const refG = orig[idx + 1]!;
       const refB = orig[idx + 2]!;
-      const entry = closestEntry(
-        sr,
-        sg,
-        sb,
-        palette,
-        metric,
-        [refR, refG, refB],
-        clickBias,
-      );
+      const effKey = (sr << 16) | (sg << 8) | sb;
+      const refKey = (refR << 16) | (refG << 8) | refB;
+      const memoKey = effKey * 0x1000000 + refKey;
+      let entry = memo.get(memoKey);
+      if (entry === undefined) {
+        entry = closestEntry(
+          sr,
+          sg,
+          sb,
+          palette,
+          metric,
+          [refR, refG, refB],
+          clickBias,
+        );
+        memo.set(memoKey, entry);
+      }
       result[y * w + x] = entry;
 
       if (weights) {

@@ -58,7 +58,7 @@ export interface ExportArtMapOptions {
    *   {col}    1-based grid column (1..gridW)
    *   {count}  1-based row-major tile index (1..gridW*gridH)
    *
-   * Defaults to `_R{row}C{col}`. Pass an empty string to disable
+   * Defaults to ` {count}`. Pass an empty string to disable
    * appending (the base title is used verbatim for every tile, which
    * only makes sense for 1x1 grids; the server will append `_1` etc.
    * for collisions).
@@ -80,10 +80,11 @@ export interface ExportArtMapOptions {
 
 const ARTMAP_MIN_TITLE = 3;
 const ARTMAP_MAX_TITLE = 16;
-// Space-separated by default ("Art R1C1") since ArtMap accepts spaces in
-// titles and it reads more naturally than underscore-glued. Power users
-// can override via opts.suffixTemplate (e.g. "_R{row}C{col}", " #{count}").
-export const DEFAULT_SUFFIX_TEMPLATE = " R{row}C{col}";
+// Space-separated by default ("Art 1") since ArtMap accepts spaces in
+// titles and the running tile count reads more naturally than a row/col
+// pair. Power users can override via opts.suffixTemplate
+// (e.g. " R{row}C{col}", " #{count}").
+export const DEFAULT_SUFFIX_TEMPLATE = " {count}";
 
 /**
  * Substitute {row}, {col}, {count} in a suffix template. Unknown

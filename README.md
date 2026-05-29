@@ -1,16 +1,50 @@
+<div align="center">
+
 # ArtMapify
 
-Convert an image into a grid of Minecraft maps you can paint in-game using the [ArtMap](https://gitlab.com/BlockStack/ArtMap) plugin. Given a source image and a canvas size (in tiles), it produces:
+**Turn any image into a grid of Minecraft maps you can paint in-game.**
+
+Built for the [ArtMap](https://gitlab.com/BlockStack/ArtMap) plugin. Pick a canvas size in tiles, drop in a picture, and get a preview plus a step-by-step build guide for every map.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D20-43853d.svg?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black.svg?logo=next.js&logoColor=white)](https://nextjs.org)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Melishy/artmapify/pulls)
+
+[Web app](web/) &nbsp;&middot;&nbsp; [CLI](#quick-start) &nbsp;&middot;&nbsp; [Arguments](#command-line-arguments) &nbsp;&middot;&nbsp; [How it works](#shade-digits-on-the-guides)
+
+</div>
+
+---
+
+## What you get
+
+Give it a source image and a canvas size (in tiles) and it produces:
 
 - a **preview** of what the finished art will look like in-game,
 - one **guide image per map tile** showing which item to use in each cell and how many times to darken it,
 - an optional **combined canvas** that stitches all guide tiles together,
 - a **summary.json** with total dye counts.
 
-Two ways to use it:
+## Two ways to use it
 
-- **Web app** (no install). Drop in an image, tweak settings, download a zip. See [`web/`](web/).
-- **CLI** (this repo). Scripting, batching, reproducible runs.
+|             | Best for                                                   | Where          |
+| ----------- | ---------------------------------------------------------- | -------------- |
+| **Web app** | No install. Drop an image, tweak settings, download a zip. | [`web/`](web/) |
+| **CLI**     | Scripting, batching, reproducible runs.                    | this repo      |
+
+## Contents
+
+- [Shade digits on the guides](#shade-digits-on-the-guides)
+- [Requirements](#requirements)
+- [Install](#install)
+- [Item textures](#item-textures)
+- [Quick start](#quick-start)
+- [Command-line arguments](#command-line-arguments)
+- [Examples](#examples)
+- [Re-running the same job](#re-running-the-same-job)
+- [Project layout](#project-layout)
+- [Notes on the palette](#notes-on-the-palette)
 
 ## Shade digits on the guides
 
@@ -202,4 +236,8 @@ scripts/
 
 ## Notes on the palette
 
-`core/palette.csv` covers the 61 non-void colors the ArtMap plugin exposes. Shade columns are ordered brightest to darkest so the column index directly equals the number of coal clicks the guide tells you to do. The values are validated against the [Minecraft wiki map color table](https://minecraft.wiki/w/Map_item_format#Base_colors). Run `node scripts/gen-palette.mjs --check` to diff against the authoritative table; run `node scripts/gen-palette.mjs` (no flag) to regenerate both `core/palette.csv` and the bundled `core/src/palette-data.ts`.
+`core/palette.csv` covers the 61 non-void colors the ArtMap plugin exposes. Shade columns are ordered brightest to darkest. `Color1` is the base color you get just by placing the material; `Color0` is one bone meal click brighter, and `Color2`/`Color3` are one and two coal clicks darker. The values are validated against the [Minecraft wiki map color table](https://minecraft.wiki/w/Map_item_format#Base_colors). Run `node scripts/gen-palette.mjs --check` to diff against the authoritative table; run `node scripts/gen-palette.mjs` (no flag) to regenerate both `core/palette.csv` and the bundled `core/src/palette-data.ts`.
+
+## License
+
+[MIT](LICENSE) &copy; melishy

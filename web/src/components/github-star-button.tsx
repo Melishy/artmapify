@@ -72,9 +72,11 @@ export function GitHubStarButton({ owner, repo, label = "Star" }: Props) {
       target="_blank"
       rel="noreferrer"
       className={buttonVariants({ variant: "outline", size: "sm" })}
+      title={`${label} on GitHub`}
+      aria-label={`${label} on GitHub`}
     >
       <GitHubMark className="size-3.5" aria-hidden />
-      <span>{label}</span>
+      <span className="hidden lg:inline">{label}</span>
       <span className="text-muted-foreground flex items-center gap-0.5">
         <Star className="size-3" aria-hidden />
         <span className="tabular-nums">{formatCount(stars)}</span>
