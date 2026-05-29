@@ -4,6 +4,46 @@
 
 import type { ColorMetric, Palette, PaletteEntry, RGB } from "./types.ts";
 
+// Per-entry values that depend only on the palette, not the pixel being
+// matched. Computing the YUV decomposition and saturation magnitude of every
+// dye once per palette (instead of once per pixel per dye) is the single
+// biggest win in the luma-hue inner loop: it removes one Math.sqrt and a
+// handful of multiplies from the hottest path in the whole pipeline.
+interface LumaHueEntry {
+  ye: number;
+  ue: number;
+  ve: number;
+  satE: number;
+  cost: number;
+}
+
+// Keyed by the palette object so each parsed palette computes this lazily on
+// first use and reuses it forever. WeakMap lets a discarded palette get
+// collected without us leaking the cache.
+const lumaHueCache = new WeakMap<Palette, LumaHueEntry[]>();
+
+function getLumaHueEntries(palette: Palette): LumaHueEntry[] {
+  let cached = lumaHueCache.get(palette);
+  if (cached) return cached;
+  cached = palette.entries.map((e) => {
+    const er = e.rgb[0],
+      eg = e.rgb[1],
+      eb = e.rgb[2];
+    const ye = 0.299 * er + 0.587 * eg + 0.114 * eb;
+    const ue = eb - ye;
+    const ve = er - ye;
+    return {
+      ye,
+      ue,
+      ve,
+      satE: Math.sqrt(ue * ue + ve * ve),
+      cost: clickCost(e.shade),
+    };
+  });
+  lumaHueCache.set(palette, cached);
+  return cached;
+}
+
 function hexToRgb(hex: string): RGB | null {
   const s = hex.trim().replace(/^#/, "");
   if (s.length !== 6) return null;
@@ -258,34 +298,32 @@ function closestLumaHue(
   }
   const hueWeight = Math.min(1, satGate / 40);
 
-  let best = palette.entries[0]!;
+  // Per-entry YUV + saturation are precomputed once per palette, so the loop
+  // below is pure arithmetic with no sqrt and no property chasing into rgb.
+  const lh = getLumaHueEntries(palette);
+  const entries = palette.entries;
+  const n = entries.length;
+  let best = entries[0]!;
   let bestDist = Infinity;
-  for (const e of palette.entries) {
-    const er = e.rgb[0],
-      eg = e.rgb[1],
-      eb = e.rgb[2];
-    const ye = 0.299 * er + 0.587 * eg + 0.114 * eb;
-    const ue = eb - ye;
-    const ve = er - ye;
-
-    const dY = yp - ye;
-    const dU = up - ue;
-    const dV = vp - ve;
+  for (let i = 0; i < n; i++) {
+    const pe = lh[i]!;
+    const dY = yp - pe.ye;
+    const dU = up - pe.ue;
+    const dV = vp - pe.ve;
 
     const lumaTerm = 2 * dY * dY;
     const hueTerm = hueWeight * (dU * dU + dV * dV);
-    const satE = Math.sqrt(ue * ue + ve * ve);
-    const overSatPenalty = Math.max(0, satE - satGate);
+    const overSatPenalty = pe.satE > satGate ? pe.satE - satGate : 0;
     const neutralTerm = (1 - hueWeight) * overSatPenalty * overSatPenalty;
     let d = lumaTerm + hueTerm + neutralTerm;
     if (clickBias > 0) {
-      const c = clickCost(e.shade);
+      const c = pe.cost;
       d += clickBias * c * c;
     }
 
     if (d < bestDist) {
       bestDist = d;
-      best = e;
+      best = entries[i]!;
     }
   }
   return best;

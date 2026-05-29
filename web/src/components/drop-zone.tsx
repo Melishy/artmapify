@@ -206,9 +206,15 @@ export function SourceButton({ onFile }: { onFile: PickFile }): ReactNode {
   return (
     <>
       {input}
-      <Button variant="default" size="sm" onClick={pick}>
+      <Button
+        variant="default"
+        size="sm"
+        onClick={pick}
+        title="Choose an image"
+        aria-label="Choose image"
+      >
         <Upload />
-        Choose image
+        <span className="hidden lg:inline">Choose image</span>
       </Button>
       <Button
         variant="outline"
@@ -218,9 +224,10 @@ export function SourceButton({ onFile }: { onFile: PickFile }): ReactNode {
           void paste();
         }}
         title="Paste an image from clipboard (Ctrl+V works anywhere on the page)"
+        aria-label="Paste image"
       >
         <Clipboard />
-        Paste
+        <span className="hidden lg:inline">Paste</span>
       </Button>
       {error ? (
         <span className="text-destructive text-[10px]" role="alert">

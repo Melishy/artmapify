@@ -36,11 +36,11 @@ export function KoFiButton({ username, label = "Buy me a coffee" }: Props) {
       />
       {/* Inner pill carrying the actual content. flex-1 + min-h ensures
        * the inner element fills the link and has consistent height across
-       * browsers; px-2.5 matches Button sm. The label hides on <sm so the
-       * button doesn't dominate the toolbar on mobile. */}
+       * browsers; px-2.5 matches Button sm. The label hides below lg so the
+       * button doesn't dominate the toolbar on smaller screens. */}
       <span className="bg-background text-foreground group-hover/kofi:bg-background/95 relative z-10 flex h-[calc(100%-3px)] items-center gap-1.5 rounded-[9px] px-2.5 transition-colors">
         <Coffee className="size-3.5 shrink-0 text-[#ff5e5b]" aria-hidden />
-        <span className="hidden sm:inline">{label}</span>
+        <span className="hidden lg:inline">{label}</span>
       </span>
     </a>
   );

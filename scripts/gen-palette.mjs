@@ -1,12 +1,13 @@
 // Regenerate palette.csv from authoritative Minecraft base map colors.
 // Source: https://minecraft.wiki/w/Map_item_format#Base_colors
 //
-// For each base color with RGB (r,g,b), the four map shades are (by click
-// count, the number of darken clicks from the base material):
-//   click 0: r * 255/255 = r        brightest (as placed, MC byte 2)
-//   click 1: r * 220/255            second brightest (MC byte 1)
-//   click 2: r * 180/255            second darkest (MC byte 0)
-//   click 3: r * 135/255            darkest (MC byte 3)
+// For each base color with RGB (r,g,b), the four map shades are:
+//   Color0: r * 255/255 = r   brightest (MC byte 2), reached by 1 bone meal click
+//   Color1: r * 220/255       the placed base color (MC byte 1), 0 clicks
+//   Color2: r * 180/255       1 coal click darker (MC byte 0)
+//   Color3: r * 135/255       darkest (MC byte 3), 2 coal clicks darker
+// Color1 is what you get just by placing the material. Bone meal brightens it
+// one step to Color0; coal darkens it one step to Color2, twice to Color3.
 // Integer division (floor), matching the wiki's "finally rounding down".
 //
 // CSV layout (brightest to darkest): Item,Color0,Color1,Color2,Color3
@@ -85,10 +86,10 @@ const entries = [
 ];
 
 const SHADES = [
-  { label: "Color0", mul: 255 }, // 0 clicks = brightest (base)
-  { label: "Color1", mul: 220 }, // 1 click
-  { label: "Color2", mul: 180 }, // 2 clicks
-  { label: "Color3", mul: 135 }, // 3 clicks = darkest
+  { label: "Color0", mul: 255 }, // brightest, 1 bone meal click up from base
+  { label: "Color1", mul: 220 }, // the placed base color, 0 clicks
+  { label: "Color2", mul: 180 }, // 1 coal click down from base
+  { label: "Color3", mul: 135 }, // darkest, 2 coal clicks down from base
 ];
 
 function hex(n) {
