@@ -31,7 +31,7 @@ Give it a source image and a canvas size (in tiles) and it produces:
 |             | Best for                                                   | Where          |
 | ----------- | ---------------------------------------------------------- | -------------- |
 | **Web app** | No install. Drop an image, tweak settings, download a zip. | [`web/`](web/) |
-| **CLI**     | Scripting, batching, reproducible runs.                    | this repo      |
+| **CLI**     | Scripting, batching, reproducible runs.                    | [`cli/`](cli/) |
 
 ## Contents
 
