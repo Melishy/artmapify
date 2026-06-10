@@ -11,6 +11,7 @@ import {
   isUuid,
   offlinePlayerUuid,
   quantize,
+  resolveAspect,
   splitIntoTiles,
   todayDDMMYYYY,
   type Adjustments,
@@ -324,12 +325,13 @@ async function applyAspectAuto(args: Args): Promise<void> {
   }
   const budget = Math.max(1, args.gridW * args.gridH);
   const aspect = iw / ih;
-  // gridW * gridH = budget, gridW / gridH = aspect
-  // => gridH = sqrt(budget / aspect), gridW = aspect * gridH
-  let gh = Math.sqrt(budget / aspect);
-  let gw = aspect * gh;
-  gw = Math.max(1, Math.round(gw));
-  gh = Math.max(1, Math.round(gh));
+  const { gridW: gw, gridH: gh } = resolveAspect(
+    iw,
+    ih,
+    args.gridW,
+    args.gridH,
+    true,
+  );
   console.log(
     `--aspect auto: input ${iw}x${ih} (${aspect.toFixed(3)}:1), ` +
       `tiles ${args.gridW}x${args.gridH} -> ${gw}x${gh} (budget ${budget}).`,
