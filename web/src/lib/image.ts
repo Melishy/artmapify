@@ -175,15 +175,12 @@ function applyAdjustments(img: ImageData, adj: Adjustments): void {
     let g = d[i + 1]!;
     let bl = d[i + 2]!;
 
+    // Order matches the CLI: sharp does modulate (brightness + saturation)
+    // first, then linear (contrast).
     if (doB) {
       r = r * b;
       g = g * b;
       bl = bl * b;
-    }
-    if (doC) {
-      r = c * r + cOffset;
-      g = c * g + cOffset;
-      bl = c * bl + cOffset;
     }
     if (doS) {
       // Saturation about luma (Rec.601), matching sharp.modulate roughly.
@@ -191,6 +188,11 @@ function applyAdjustments(img: ImageData, adj: Adjustments): void {
       r = y + (r - y) * s;
       g = y + (g - y) * s;
       bl = y + (bl - y) * s;
+    }
+    if (doC) {
+      r = c * r + cOffset;
+      g = c * g + cOffset;
+      bl = c * bl + cOffset;
     }
 
     d[i] = clamp255(r);

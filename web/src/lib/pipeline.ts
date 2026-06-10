@@ -39,43 +39,9 @@ export interface PipelineResult {
   summary: PipelineSummary;
 }
 
-interface AspectAutoResult {
-  gridW: number;
-  gridH: number;
-}
-
-/**
- * If requested, rescale gridW/gridH to match the source aspect ratio,
- * keeping the same tile budget (gridW*gridH). Matches the CLI logic.
- */
-export function resolveAspect(
-  sourceW: number,
-  sourceH: number,
-  gridW: number,
-  gridH: number,
-  aspectAuto: boolean,
-): AspectAutoResult {
-  if (!aspectAuto) return { gridW, gridH };
-  const budget = Math.max(1, gridW * gridH);
-  const srcAspect = sourceW / sourceH;
-  // Find integer w*h with w*h == budget (or nearby) and w/h closest to srcAspect.
-  let bestW = gridW;
-  let bestH = gridH;
-  let bestDiff = Infinity;
-  for (let w = 1; w <= budget; w++) {
-    for (let h = 1; h <= budget; h++) {
-      const area = w * h;
-      if (area !== budget) continue;
-      const diff = Math.abs(w / h - srcAspect);
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        bestW = w;
-        bestH = h;
-      }
-    }
-  }
-  return { gridW: bestW, gridH: bestH };
-}
+// Re-export so existing imports from "@/lib/pipeline" keep working; the
+// single implementation lives in core.
+export { resolveAspect } from "@artmapify/core";
 
 export async function runPipeline(
   blob: Blob,

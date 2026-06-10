@@ -32,7 +32,11 @@ export async function prepareImage(
   const targetH = gridH * tileSize;
 
   let img = sharp(inputPath)
-    .removeAlpha()
+    // Composite any alpha over black instead of removeAlpha(): removeAlpha
+    // drops the channel without compositing, so transparent pixels leak
+    // whatever hidden rgb the encoder stored. flatten matches the web app,
+    // which draws onto a black-filled canvas.
+    .flatten({ background: { r: 0, g: 0, b: 0 } })
     .resize(targetW, targetH, {
       kernel: "lanczos3",
       fit,

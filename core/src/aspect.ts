@@ -21,15 +21,13 @@ export function resolveAspect(
   let bestH = gridH;
   let bestDiff = Infinity;
   for (let w = 1; w <= budget; w++) {
-    for (let h = 1; h <= budget; h++) {
-      const area = w * h;
-      if (area !== budget) continue;
-      const diff = Math.abs(w / h - srcAspect);
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        bestW = w;
-        bestH = h;
-      }
+    if (budget % w !== 0) continue;
+    const h = budget / w;
+    const diff = Math.abs(w / h - srcAspect);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestW = w;
+      bestH = h;
     }
   }
   return { gridW: bestW, gridH: bestH };
