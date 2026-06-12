@@ -41,10 +41,10 @@ npm start
 
 ## Stack
 
-- Next.js 16 (App Router, Turbopack, React Compiler)
+- Next.js 16 (App Router, Turbopack)
 - Tailwind v4 + shadcn/ui (base-ui primitives)
 - Canvas API + jszip for client-side image processing and zip output
-- next-themes for dark mode
+- Dark mode only
 
 ## Assets
 
