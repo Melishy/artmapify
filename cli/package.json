@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@artmapify/core": "*",
-    "sharp": "^0.35.1"
+    "sharp": "^0.35.2"
   },
   "devDependencies": {
     "@types/node": "^25.9.3",
