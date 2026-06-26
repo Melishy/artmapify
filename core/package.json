@@ -23,7 +23,7 @@
     "pako": "^2.1.0"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.0.0",
     "@types/pako": "^2.0.3",
     "typescript": "^6"
   }
