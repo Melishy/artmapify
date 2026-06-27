@@ -1,7 +1,17 @@
 "use client";
 
-import { RotateCcw, Sparkles } from "lucide-react";
+import { Check, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -16,6 +26,12 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { PRESETS } from "@/lib/presets";
 import type { PipelineSettings } from "@/lib/types";
+
+// Above this many maps (gridW * gridH) the pipeline and the per-tile guide
+// rendering start to get heavy enough that lower-end machines stutter. We
+// don't block it, just make the user confirm so a fat-fingered "100" doesn't
+// silently lock up their browser.
+const RECOMMENDED_MAX_TILES = 100;
 
 export interface ControlsPanelProps {
   settings: PipelineSettings;
@@ -32,6 +48,43 @@ export function ControlsPanel(props: ControlsPanelProps) {
     key: K,
     value: PipelineSettings[K],
   ) => onChange({ ...settings, [key]: value });
+
+  // Canvas size is staged locally and only pushed to the pipeline when the
+  // user clicks Apply, so an accidental "100" doesn't kick off a huge run on
+  // every keystroke. Presets, reset, and aspect-auto still update settings
+  // directly, so we resync the draft whenever the committed size changes.
+  // This uses the "adjust state during render" pattern (tracking the last
+  // committed size) instead of an effect, which keeps the draft in lockstep
+  // without an extra render pass. See react.dev/learn/you-might-not-need-an-effect.
+  const [draftW, setDraftW] = useState(settings.gridW);
+  const [draftH, setDraftH] = useState(settings.gridH);
+  const [committed, setCommitted] = useState({
+    w: settings.gridW,
+    h: settings.gridH,
+  });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  if (committed.w !== settings.gridW || committed.h !== settings.gridH) {
+    setCommitted({ w: settings.gridW, h: settings.gridH });
+    setDraftW(settings.gridW);
+    setDraftH(settings.gridH);
+  }
+
+  const sizeDirty = draftW !== settings.gridW || draftH !== settings.gridH;
+
+  const commitSize = () => {
+    onChange({ ...settings, gridW: draftW, gridH: draftH });
+    setConfirmOpen(false);
+  };
+
+  const applySize = () => {
+    if (!sizeDirty) return;
+    if (draftW * draftH > RECOMMENDED_MAX_TILES) {
+      setConfirmOpen(true);
+      return;
+    }
+    commitSize();
+  };
 
   const setAdj = <K extends keyof PipelineSettings["adjustments"]>(
     key: K,
@@ -67,25 +120,45 @@ export function ControlsPanel(props: ControlsPanelProps) {
           <Row>
             <Field label="Width (tiles)">
               <NumberInput
-                value={settings.gridW}
+                value={draftW}
                 min={1}
-                max={32}
+                max={128}
                 step={1}
                 disabled={aspectAuto}
-                onChange={(v) => set("gridW", v)}
+                onChange={setDraftW}
+                onEnter={applySize}
               />
             </Field>
             <Field label="Height (tiles)">
               <NumberInput
-                value={settings.gridH}
+                value={draftH}
                 min={1}
-                max={32}
+                max={128}
                 step={1}
                 disabled={aspectAuto}
-                onChange={(v) => set("gridH", v)}
+                onChange={setDraftH}
+                onEnter={applySize}
               />
             </Field>
           </Row>
+          <Button
+            type="button"
+            size="sm"
+            variant={sizeDirty ? "default" : "outline"}
+            disabled={aspectAuto || !sizeDirty}
+            onClick={applySize}
+            className="w-full"
+            title={
+              aspectAuto
+                ? "Turn off auto aspect to set the size manually"
+                : "Apply the canvas size"
+            }
+          >
+            <Check />
+            {sizeDirty
+              ? `Apply ${draftW}x${draftH} (${draftW * draftH} maps)`
+              : "Size applied"}
+          </Button>
           <Row>
             <Field label="Auto aspect" hint="Match image ratio">
               <Switch
@@ -276,6 +349,41 @@ export function ControlsPanel(props: ControlsPanelProps) {
           Reset to defaults
         </Button>
       </div>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TriangleAlert className="size-4 text-amber-500" />
+              Large canvas
+            </DialogTitle>
+            <DialogDescription>
+              A {draftW}x{draftH} canvas is {draftW * draftH} maps (
+              {(
+                draftW *
+                draftH *
+                settings.tileSize *
+                settings.tileSize
+              ).toLocaleString()}{" "}
+              dye cells). Processing and rendering this many tiles can be slow
+              and may make the page lag on lower-end devices. Apply anyway?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose
+              render={
+                <Button variant="outline" size="sm">
+                  Cancel
+                </Button>
+              }
+            />
+            <Button size="sm" onClick={commitSize}>
+              <Check />
+              Apply anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -328,6 +436,7 @@ function NumberInput({
   step = 1,
   disabled,
   onChange,
+  onEnter,
 }: {
   value: number;
   min?: number;
@@ -335,19 +444,61 @@ function NumberInput({
   step?: number;
   disabled?: boolean;
   onChange: (v: number) => void;
+  onEnter?: () => void;
 }) {
+  // Keep the raw text locally so the field can be empty (or mid-edit like
+  // "1") while typing, without pushing a half-finished or 0 value into the
+  // pipeline. We only commit a clamped number when the text parses, and we
+  // snap back to the last good value on blur. `draft` is null whenever the
+  // input mirrors the committed `value`, so external changes (presets,
+  // reset, aspect-auto) flow straight through.
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const clamp = (n: number) => {
+    let next = n;
+    if (min !== undefined) next = Math.max(min, next);
+    if (max !== undefined) next = Math.min(max, next);
+    return next;
+  };
+
   return (
     <Input
       type="number"
-      value={value}
+      value={draft ?? String(value)}
       min={min}
       max={max}
       step={step}
       disabled={disabled}
       onChange={(e) => {
-        const n = Number(e.target.value);
-        if (Number.isFinite(n)) onChange(n);
+        const raw = e.target.value;
+        // Always let the field show what was typed, including empty, so
+        // Backspace works. Only commit when it's a finite number, clamped
+        // into [min, max] (the native min/max attrs don't block typed-in
+        // out-of-range values). An empty or partial field commits nothing,
+        // so the last valid value keeps driving the pipeline.
+        setDraft(raw);
+        if (raw.trim() === "") return;
+        const n = Number(raw);
+        if (Number.isFinite(n)) onChange(clamp(n));
       }}
+      onBlur={() => {
+        // On blur, drop the local draft and fall back to the committed
+        // value, so an empty or out-of-range field doesn't linger.
+        if (draft === null) return;
+        const n = Number(draft);
+        if (draft.trim() !== "" && Number.isFinite(n)) onChange(clamp(n));
+        setDraft(null);
+      }}
+      onKeyDown={
+        onEnter
+          ? (e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onEnter();
+              }
+            }
+          : undefined
+      }
     />
   );
 }

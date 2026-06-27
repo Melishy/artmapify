@@ -1,13 +1,27 @@
 "use client";
 
-import { Info, Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Hand, Info, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CanvasView } from "./canvas-view";
+import { PanContainer } from "./pan-container";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { AnyCanvas } from "@/lib/render";
-import { renderTileCanvas } from "@/lib/render";
+import {
+  renderPreviewCanvas,
+  renderTileCanvas,
+  sliceTileThumb,
+} from "@/lib/render";
 import type { PipelineSettings, RenderOptions, Tile } from "@/lib/types";
+
+// Thumbnails are sized so exactly this many columns fill the panel width.
+// A grid this size or smaller fits without scrolling; anything larger keeps
+// the same per-thumb size and overflows, so you drag to pan instead of the
+// tiles shrinking. The gap here must match the grid's `gap-2` (0.5rem).
+const THUMB_FIT_COLS = 6;
+const THUMB_GAP_PX = 8;
+// Floor so a thumbnail never collapses to nothing on a very narrow panel.
+const THUMB_MIN_PX = 72;
 
 interface Props {
   tiles: Tile[];
@@ -21,16 +35,34 @@ export function TileViewer({ tiles, settings, itemTextures }: Props) {
   const total = tiles.length;
   const tile = tiles[selected] ?? tiles[0];
 
-  const thumbOpts: RenderOptions = useMemo(
-    () => ({
-      cellSize: Math.max(4, Math.floor(settings.cellSize / 4)),
-      itemTextures,
-      texturePadding: settings.texturePadding,
-      cellBorder: 0,
-      rulerMargin: 0,
-      outlineRuns: true,
-    }),
-    [itemTextures, settings.cellSize, settings.texturePadding],
+  // Measure the panel so we can size thumbnails to fit THUMB_FIT_COLS across.
+  // Locking that pixel size means bigger grids overflow and pan rather than
+  // shrinking the tiles. Grids narrower than THUMB_FIT_COLS use their own
+  // column count instead, so a 2-wide grid grows to fill the width rather
+  // than leaving a gap where the extra columns would be.
+  const [panelW, setPanelW] = useState(0);
+  const panelRef = useMeasuredWidth(setPanelW);
+  const thumbPx = useMemo(() => {
+    if (panelW <= 0) return THUMB_MIN_PX;
+    const cols = Math.min(THUMB_FIT_COLS, settings.gridW);
+    const gaps = THUMB_GAP_PX * (cols - 1);
+    return Math.max(THUMB_MIN_PX, Math.floor((panelW - gaps) / cols));
+  }, [panelW, settings.gridW]);
+
+  // One flat preview canvas for the whole grid. Thumbnails are sliced out of
+  // this instead of each re-rendering its own guide (no per-cell textures or
+  // shade digits), which is dramatically cheaper for large grids. Scale 1 is
+  // plenty since thumbs downscale anyway; the slice picks the tile's block.
+  const previewCanvas = useMemo(
+    () =>
+      renderPreviewCanvas(
+        tiles,
+        settings.gridW,
+        settings.gridH,
+        settings.tileSize,
+        1,
+      ),
+    [tiles, settings.gridW, settings.gridH, settings.tileSize],
   );
 
   const fullOpts: RenderOptions = useMemo(
@@ -57,10 +89,14 @@ export function TileViewer({ tiles, settings, itemTextures }: Props) {
     ],
   );
 
+  // Slice at the native tile size; the thumbnail is CSS-scaled to fit its
+  // cell, so the output stays crisp (pixelated) and resizing the panel never
+  // re-runs this. Each slice is one tiny drawImage.
   const thumbs = useProgressiveRender(
     tiles,
-    (t) => renderTileCanvas(t, settings.tileSize, thumbOpts),
-    [tiles, settings.tileSize, thumbOpts],
+    (t) =>
+      sliceTileThumb(previewCanvas, t, settings.tileSize, 1, settings.tileSize),
+    [tiles, settings.tileSize, previewCanvas],
   );
 
   const fullCanvas = useDeferredValue(
@@ -145,31 +181,45 @@ export function TileViewer({ tiles, settings, itemTextures }: Props) {
           </div>
         )}
       </div>
-      <div
-        className="grid gap-2"
-        style={{
-          gridTemplateColumns: `repeat(${settings.gridW}, minmax(0, 1fr))`,
-        }}
-      >
-        {tiles.map((t, i) => {
-          const canvas = thumbs[i];
-          return canvas ? (
-            <TileThumb
-              key={i}
-              canvas={canvas}
-              selected={i === selected}
-              onClick={() => setSelected(i)}
-              label={`${t.gx},${t.gy}`}
-            />
-          ) : (
-            <ThumbPlaceholder
-              key={i}
-              selected={i === selected}
-              onClick={() => setSelected(i)}
-              label={`${t.gx},${t.gy}`}
-            />
-          );
-        })}
+      {/* Thumbnails are sized so THUMB_FIT_COLS fill the panel width, then
+       * locked at that size. A 3x3 (or smaller) fits exactly; bigger grids
+       * keep the same tile size and overflow, so you drag to pan instead of
+       * the tiles shrinking. The wrapper is measured to drive that size. */}
+      {settings.gridW > THUMB_FIT_COLS ? (
+        <p className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+          <Hand className="size-3.5" aria-hidden />
+          Drag the guides below to pan across all {total} maps.
+        </p>
+      ) : null}
+      <div ref={panelRef}>
+        <PanContainer className="py-1" maxHeight="60vh">
+          <div
+            className="grid w-max gap-2"
+            style={{
+              gridTemplateColumns: `repeat(${settings.gridW}, ${thumbPx}px)`,
+            }}
+          >
+            {tiles.map((t, i) => {
+              const canvas = thumbs[i];
+              return canvas ? (
+                <TileThumb
+                  key={i}
+                  canvas={canvas}
+                  selected={i === selected}
+                  onClick={() => setSelected(i)}
+                  label={`${t.gx},${t.gy}`}
+                />
+              ) : (
+                <ThumbPlaceholder
+                  key={i}
+                  selected={i === selected}
+                  onClick={() => setSelected(i)}
+                  label={`${t.gx},${t.gy}`}
+                />
+              );
+            })}
+          </div>
+        </PanContainer>
       </div>
       {thumbs.filter(Boolean).length !== tiles.length ? (
         <div className="text-muted-foreground inline-flex items-center gap-1 text-xs">
@@ -309,4 +359,35 @@ function useProgressiveRender<T, R>(
   }, deps);
 
   return out;
+}
+/**
+ * Ref callback that reports an element's content-box width and keeps it
+ * current via a ResizeObserver. Used to size thumbnails to the panel.
+ */
+function useMeasuredWidth(
+  onWidth: (w: number) => void,
+): (el: HTMLElement | null) => void {
+  const cb = useRef(onWidth);
+  // Keep the latest callback in the ref without touching it during render
+  // (the React Compiler flags ref writes in render). An effect is the right
+  // place: it runs after commit, so the ref callback always sees the current
+  // onWidth without re-creating the observer.
+  useEffect(() => {
+    cb.current = onWidth;
+  }, [onWidth]);
+
+  return useCallback((el: HTMLElement | null) => {
+    if (!el) return;
+    cb.current(el.clientWidth);
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w =
+          entry.contentBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
+        cb.current(Math.floor(w));
+      }
+    });
+    ro.observe(el);
+    // The cleanup runs when React detaches the ref (unmount or ref change).
+    return () => ro.disconnect();
+  }, []);
 }

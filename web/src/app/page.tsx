@@ -10,9 +10,9 @@ import { DownloadZip } from "@/components/download-zip";
 import { DropTarget, SourceButton, SourceChip } from "@/components/drop-zone";
 import { DyeTotals } from "@/components/dye-totals";
 import { GitHubStarButton } from "@/components/github-star-button";
-import { KoFiButton } from "@/components/ko-fi-button";
 import { PreviewView } from "@/components/preview-view";
 import { SettingsPopover } from "@/components/settings-popover";
+import { SupportButton } from "@/components/support-button";
 import { TileViewer } from "@/components/tile-viewer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -310,11 +310,11 @@ export default function Home() {
                 )}
               />
             </Button>
-            {/* Non-essential links collapse first on tiny screens: Ko-fi
-             * hides below 400px, GitHub below 480px, so the core buttons
-             * always fit without overlapping. */}
+            {/* Non-essential links collapse first on tiny screens: the
+             * support button hides below 400px, GitHub below 480px, so the
+             * core buttons always fit without overlapping. */}
             <span className="hidden min-[400px]:inline-flex">
-              <KoFiButton username="melishy" />
+              <SupportButton email="themelishy@outlook.com" />
             </span>
             <span className="hidden min-[480px]:inline-flex">
               <GitHubStarButton owner="Melishy" repo="artmapify" />

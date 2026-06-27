@@ -4,8 +4,8 @@ import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ControlsPanel } from "@/components/controls-panel";
 import { GitHubStarButton } from "@/components/github-star-button";
-import { KoFiButton } from "@/components/ko-fi-button";
 import { Button } from "@/components/ui/button";
+import { SupportButton } from "@/components/support-button";
 import type { PipelineSettings } from "@/lib/types";
 
 interface Props {
@@ -123,9 +123,9 @@ export function SettingsPopover(props: Props) {
           <div className="flex items-center gap-2">
             {/* Mirror of the topbar links. They show here only at the widths
              * where the toolbar hides them, so the actions stay reachable:
-             * Ko-fi under 400px, GitHub under 480px. */}
+             * support under 400px, GitHub under 480px. */}
             <span className="inline-flex min-[400px]:hidden">
-              <KoFiButton username="melishy" />
+              <SupportButton email="themelishy@outlook.com" />
             </span>
             <span className="inline-flex min-[480px]:hidden">
               <GitHubStarButton owner="Melishy" repo="artmapify" />
