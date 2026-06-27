@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
   // Pin Turbopack's root to the monorepo root (the only place a
   // package-lock.json should live). This silences Next's "multiple
   // lockfiles" warning and lets it walk up to find @artmapify/core.
+  
   // Module resolution still works because Next walks node_modules
   // upward from web/, finding both web/node_modules/tailwindcss and
   // root node_modules/@artmapify/core.

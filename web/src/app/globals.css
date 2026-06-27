@@ -168,6 +168,10 @@
   }
   html {
     @apply bg-background font-sans;
+    /* Always reserve the vertical scrollbar gutter so switching between
+     * tabs of different heights (e.g. Preview vs the taller Export panel)
+     * doesn't add/remove the scrollbar and shift the whole layout. */
+    scrollbar-gutter: stable;
   }
   body {
     @apply text-foreground;

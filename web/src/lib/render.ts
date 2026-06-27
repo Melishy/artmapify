@@ -40,6 +40,30 @@ function get2d(c: AnyCanvas): Any2D {
   return ctx as Any2D;
 }
 
+/**
+ * Thumbnail for a single tile, sliced straight out of an already-rendered
+ * preview canvas. This is much cheaper than re-running renderTileCanvas per
+ * tile: it's one scaled drawImage instead of a per-cell loop plus texture and
+ * digit drawing. The preview lays tiles out at `gridSize` px each, so tile
+ * (gx,gy) lives at the matching block. `outPx` is the output square size.
+ */
+export function sliceTileThumb(
+  preview: AnyCanvas,
+  tile: Tile,
+  gridSize: number,
+  previewScale: number,
+  outPx: number,
+): AnyCanvas {
+  const srcSize = gridSize * previewScale;
+  const srcX = (tile.gx - 1) * srcSize;
+  const srcY = (tile.gy - 1) * srcSize;
+  const out = makeCanvas(outPx, outPx);
+  const ctx = get2d(out);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(preview, srcX, srcY, srcSize, srcSize, 0, 0, outPx, outPx);
+  return out;
+}
+
 /** Render one map tile into a canvas. */
 export function renderTileCanvas(
   tile: Tile,
