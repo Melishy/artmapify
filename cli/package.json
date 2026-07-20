@@ -20,11 +20,11 @@
   },
   "dependencies": {
     "@artmapify/core": "*",
-    "sharp": "^0.35.1"
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
-    "@types/node": "^26.0.0",
-    "tsx": "^4.22.4",
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.1",
     "typescript": "^6.0.3"
   }
 }
