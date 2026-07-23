@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import sharp, { type OverlayOptions } from "sharp";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { PaletteEntry, Tile } from "@artmapify/core";
@@ -95,7 +95,7 @@ export async function renderTileImage(
   const border = Math.max(0, Math.floor(opts.cellBorder ?? 1));
 
   // Build each unique cell image once.
-  const composites: sharp.OverlayOptions[] = [];
+  const composites: OverlayOptions[] = [];
   for (let y = 0; y < gridSize; y++) {
     for (let x = 0; x < gridSize; x++) {
       const entry = tile.cells[y * gridSize + x]!;
@@ -209,7 +209,7 @@ export async function renderTileImage(
   // Wrap with a white margin on top and left, and stamp column/row numbers.
   const outerW = totalW + margin;
   const outerH = totalH + margin;
-  const rulerComposites: sharp.OverlayOptions[] = [
+  const rulerComposites: OverlayOptions[] = [
     { input: inner, top: margin, left: margin },
   ];
 
@@ -345,7 +345,7 @@ export async function renderCanvasImage(
   // Tiles inside the combined canvas get no per-cell grid and no rulers;
   // the canvas only shows tile-level grid lines.
   const tileOpts: RenderOptions = { ...opts, cellBorder: 0, rulerMargin: 0 };
-  const composites: sharp.OverlayOptions[] = [];
+  const composites: OverlayOptions[] = [];
   for (const t of tiles) {
     const buf = await renderTileImage(t, gridSize, tileOpts);
     composites.push({
@@ -426,7 +426,7 @@ async function buildCellBuffer(
   const pad = Math.floor(size * padRatio);
   const texSize = Math.max(1, size - pad * 2);
 
-  const layers: sharp.OverlayOptions[] = [];
+  const layers: OverlayOptions[] = [];
 
   // Texture overlay (optional - only if the texture file exists).
   const texPath = join(opts.itemsDir, `${entry.base}.png`);
