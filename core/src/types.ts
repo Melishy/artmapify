@@ -41,10 +41,7 @@ export interface Palette {
 export type ColorMetric = "luma-hue" | "redmean" | "rgb";
 
 export type DitherMethod =
-  | "none"
-  | "floyd-steinberg"
-  | "burkes"
-  | "sierra-lite";
+  "none" | "floyd-steinberg" | "burkes" | "sierra-lite";
 
 export type FitMode = "contain" | "cover" | "fill";
 

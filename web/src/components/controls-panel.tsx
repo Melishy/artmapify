@@ -1,7 +1,13 @@
 "use client";
 
-import { Check, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import {
+  Check,
+  Link as LinkIcon,
+  RotateCcw,
+  Sparkles,
+  TriangleAlert,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,8 +30,10 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { DyeFilter } from "@/components/dye-filter";
 import { PRESETS } from "@/lib/presets";
-import type { PipelineSettings } from "@/lib/types";
+import { buildShareUrl } from "@/lib/share-url";
+import type { Palette, PipelineSettings } from "@/lib/types";
 
 // Above this many maps (gridW * gridH) the pipeline and the per-tile guide
 // rendering start to get heavy enough that lower-end machines stutter. We
@@ -39,10 +47,20 @@ export interface ControlsPanelProps {
   onChange: (next: PipelineSettings) => void;
   onAspectAutoChange: (v: boolean) => void;
   onReset: () => void;
+  palette: Palette | null;
+  itemTextures: Map<string, ImageBitmap> | null;
 }
 
 export function ControlsPanel(props: ControlsPanelProps) {
-  const { settings, aspectAuto, onChange, onAspectAutoChange, onReset } = props;
+  const {
+    settings,
+    aspectAuto,
+    onChange,
+    onAspectAutoChange,
+    onReset,
+    palette,
+    itemTextures,
+  } = props;
 
   const set = <K extends keyof PipelineSettings>(
     key: K,
@@ -229,6 +247,14 @@ export function ControlsPanel(props: ControlsPanelProps) {
             step={0.5}
             onChange={(v) => set("clickBias", v)}
           />
+          {palette ? (
+            <DyeFilter
+              palette={palette}
+              itemTextures={itemTextures}
+              excludedBases={settings.excludedBases}
+              onChange={(next) => set("excludedBases", next)}
+            />
+          ) : null}
         </Section>
 
         <Section title="Adjustments">
@@ -343,7 +369,8 @@ export function ControlsPanel(props: ControlsPanelProps) {
 
       <Separator />
 
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        <ShareLinkButton settings={settings} aspectAuto={aspectAuto} />
         <Button variant="outline" size="sm" onClick={onReset}>
           <RotateCcw />
           Reset to defaults
@@ -385,6 +412,53 @@ export function ControlsPanel(props: ControlsPanelProps) {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/**
+ * Copies a share URL carrying the current settings (see share-url.ts).
+ * Uses a brief "Copied" confirmation instead of a toast since the app
+ * has no toast primitive.
+ */
+function ShareLinkButton({
+  settings,
+  aspectAuto,
+}: {
+  settings: PipelineSettings;
+  aspectAuto: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timer.current) window.clearTimeout(timer.current);
+    };
+  }, []);
+
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        buildShareUrl({ settings, aspectAuto }),
+      );
+      setCopied(true);
+      if (timer.current) window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Clipboard blocked (permissions/insecure context); nothing to show.
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={onCopy}
+      title="Copy a link that applies these exact settings"
+    >
+      {copied ? <Check /> : <LinkIcon />}
+      {copied ? "Copied" : "Copy settings link"}
+    </Button>
   );
 }
 

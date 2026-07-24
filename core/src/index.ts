@@ -17,6 +17,7 @@ export {
   closestEntry,
   mcMapByte,
   packRgb,
+  paletteFromEntries,
   parsePaletteCsv,
   shadeOffset,
 } from "./palette.ts";
@@ -29,10 +30,18 @@ export {
   exportArtMapTile,
   isUuid,
   offlinePlayerUuid,
+  tileToUnfoldedBytes,
   todayDDMMYYYY,
   type ArtMapTileExport,
   type ExportArtMapOptions,
 } from "./artmap-export.ts";
+export {
+  exportVanillaMaps,
+  tileToVanillaNbt,
+  VANILLA_MAP_DATA_VERSION,
+  type ExportVanillaOptions,
+  type VanillaMapExport,
+} from "./vanilla-export.ts";
 
 import { parsePaletteCsv } from "./palette.ts";
 import { BUILTIN_PALETTE_CSV } from "./palette-data.ts";

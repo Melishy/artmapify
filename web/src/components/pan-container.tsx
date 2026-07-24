@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -27,7 +33,11 @@ const FADE_RAMP_PX = 28;
  * separates a click from a drag, and the trailing click after a real drag
  * is swallowed so panning over a tile doesn't also select it.
  */
-export function PanContainer({ children, className, maxHeight = "70vh" }: Props) {
+export function PanContainer({
+  children,
+  className,
+  maxHeight = "70vh",
+}: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -220,7 +230,8 @@ export function PanContainer({ children, className, maxHeight = "70vh" }: Props)
         style={{
           opacity: 0,
           width: FADE_SIZE_PX,
-          background: "linear-gradient(to left, transparent, var(--background))",
+          background:
+            "linear-gradient(to left, transparent, var(--background))",
         }}
       />
       <div
