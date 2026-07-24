@@ -14,6 +14,7 @@ import { PreviewView } from "@/components/preview-view";
 import { SettingsPopover } from "@/components/settings-popover";
 import { SupportButton } from "@/components/support-button";
 import { TileViewer } from "@/components/tile-viewer";
+import { VanillaExport } from "@/components/vanilla-export";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,7 +22,9 @@ import { withBasePath } from "@/lib/base-path";
 import { loadItemTextures } from "@/lib/image";
 import { type PipelineResult, resolveAspect } from "@/lib/pipeline";
 import { PipelineClient } from "@/lib/pipeline-client";
+import { buildProgressKey, hashFile } from "@/lib/paint-progress";
 import { loadCachedSettings, saveCachedSettings } from "@/lib/settings-cache";
+import { decodeShareHash } from "@/lib/share-url";
 import {
   clearSourceFile,
   loadSourceFile,
@@ -53,6 +56,7 @@ const DEFAULT_SETTINGS: PipelineSettings = {
   adjustments: { ...DEFAULT_ADJUSTMENTS },
   guide: false,
   combined: false,
+  excludedBases: [],
 };
 
 export default function Home() {
@@ -66,6 +70,9 @@ export default function Home() {
   const [sourceSize, setSourceSize] = useState<{ w: number; h: number } | null>(
     null,
   );
+  // SHA-256 fingerprint of the source image, for paint-along progress
+  // keying. null while hashing (or when no file is loaded).
+  const [fileHash, setFileHash] = useState<string | null>(null);
   // Settings start at defaults and get hydrated from localStorage in an
   // effect (not during render) so SSR HTML matches the first client paint.
   const [settings, setSettings] = useState<PipelineSettings>(DEFAULT_SETTINGS);
@@ -90,13 +97,26 @@ export default function Home() {
   // immediately after mount.
   const hydratedRef = useRef(false);
 
-  // Hydrate persisted state from localStorage after mount.
+  // Hydrate persisted state from localStorage after mount. A share link's
+  // hash payload (see share-url.ts) wins over the cached settings, then the
+  // hash is stripped so reloads fall back to normal persistence.
   useEffect(() => {
     const cached = loadCachedSettings();
+    const shared = decodeShareHash(window.location.hash, DEFAULT_SETTINGS);
     /* eslint-disable react-hooks/set-state-in-effect */
-    if (cached.settings)
-      setSettings({ ...DEFAULT_SETTINGS, ...cached.settings });
-    if (cached.aspectAuto !== undefined) setAspectAuto(cached.aspectAuto);
+    if (shared) {
+      setSettings(shared.settings);
+      setAspectAuto(shared.aspectAuto);
+      history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search,
+      );
+    } else {
+      if (cached.settings)
+        setSettings({ ...DEFAULT_SETTINGS, ...cached.settings });
+      if (cached.aspectAuto !== undefined) setAspectAuto(cached.aspectAuto);
+    }
     if (cached.artmapTitle !== undefined) setArtmapTitle(cached.artmapTitle);
     if (cached.artmapArtist !== undefined) setArtmapArtist(cached.artmapArtist);
     if (cached.artmapSuffix !== undefined) setArtmapSuffix(cached.artmapSuffix);
@@ -164,6 +184,26 @@ export default function Home() {
   usePasteImageListener(
     useCallback((f: File) => handlePickFile(f), [handlePickFile]),
   );
+
+  // Fingerprint the source for paint-along progress. Re-picking the same
+  // image (even renamed) hashes identically, so progress resumes.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFileHash(null);
+    if (!file) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const h = await hashFile(file);
+        if (!cancelled) setFileHash(h);
+      } catch {
+        /* WebCrypto unavailable (insecure context); progress won't persist */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [file]);
 
   // Capture source image natural dimensions for aspect-auto.
   useEffect(() => {
@@ -333,6 +373,8 @@ export default function Home() {
           setSettings(DEFAULT_SETTINGS);
           setAspectAuto(false);
         }}
+        palette={palette}
+        itemTextures={textures}
       />
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-4">
@@ -388,6 +430,16 @@ export default function Home() {
                 tiles={result.tiles}
                 settings={result.settings}
                 itemTextures={textures}
+                progressKey={
+                  fileHash
+                    ? buildProgressKey(
+                        fileHash,
+                        result.settings.gridW,
+                        result.settings.gridH,
+                        result.settings.tileSize,
+                      )
+                    : null
+                }
               />
             </TabsContent>
             <TabsContent value="dyes">
@@ -418,6 +470,29 @@ export default function Home() {
                     suffixTemplate={artmapSuffix}
                     onSuffixTemplateChange={setArtmapSuffix}
                   />
+                </section>
+
+                <section className="space-y-3">
+                  <div>
+                    <h2 className="text-sm font-semibold">Vanilla map files</h2>
+                    <p className="text-muted-foreground text-xs">
+                      No plugin needed. Generates{" "}
+                      <code className="bg-background rounded px-1 py-0.5 font-mono text-[10px]">
+                        map_N.dat
+                      </code>{" "}
+                      files you drop into your world&apos;s{" "}
+                      <code className="bg-background rounded px-1 py-0.5 font-mono text-[10px]">
+                        data/
+                      </code>{" "}
+                      folder, plus a README with the matching{" "}
+                      <code className="bg-background rounded px-1 py-0.5 font-mono text-[10px]">
+                        /give
+                      </code>{" "}
+                      commands. Works on vanilla, Spigot/Paper, and Fabric
+                      servers.
+                    </p>
+                  </div>
+                  <VanillaExport result={result} fileName={file.name} />
                 </section>
 
                 <section className="space-y-2">

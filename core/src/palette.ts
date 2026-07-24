@@ -159,6 +159,23 @@ export function parsePaletteCsv(text: string): Palette {
 }
 
 /**
+ * Build a Palette from an explicit entry list, rebuilding the lookup maps.
+ * Used to construct filtered palettes (e.g. "dyes I have") from a parsed
+ * one. byRgb keeps parsePaletteCsv's first-wins rule for duplicate colors.
+ */
+export function paletteFromEntries(entries: PaletteEntry[]): Palette {
+  if (entries.length === 0) throw new Error("Palette has no valid colors");
+  const byLabel = new Map<string, PaletteEntry>();
+  const byRgb = new Map<number, PaletteEntry>();
+  for (const entry of entries) {
+    byLabel.set(entry.label, entry);
+    const key = packRgb(entry.rgb[0], entry.rgb[1], entry.rgb[2]);
+    if (!byRgb.has(key)) byRgb.set(key, entry);
+  }
+  return { entries, byLabel, byRgb };
+}
+
+/**
  * Number of dye-tool clicks required to reach each shade from the
  * default placed state.
  *   shade 0 = feather once    -> 1 click

@@ -61,4 +61,11 @@ export interface PipelineSettings {
   guide: boolean;
   /** Stitch all guide tiles into canvas.png. Requires guide=true. */
   combined: boolean;
+  /**
+   * Palette bases (e.g. "grass", "ink_sac") the user doesn't have.
+   * Quantization matches against the remaining entries only. Empty =
+   * full palette. Lives in settings so it reaches the worker and
+   * persists/shares with everything else.
+   */
+  excludedBases: string[];
 }

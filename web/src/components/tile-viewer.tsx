@@ -1,11 +1,23 @@
 "use client";
 
-import { Hand, Info, Loader2 } from "lucide-react";
+import {
+  Brush,
+  Check,
+  Eraser,
+  Hand,
+  Info,
+  Loader2,
+  RotateCcw,
+  Ruler,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CanvasView } from "./canvas-view";
+import { PaintOverlay, type Crosshair } from "./paint-overlay";
 import { PanContainer } from "./pan-container";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { countBits, usePaintProgress } from "@/lib/paint-progress";
 import type { AnyCanvas } from "@/lib/render";
 import {
   renderPreviewCanvas,
@@ -13,6 +25,7 @@ import {
   sliceTileThumb,
 } from "@/lib/render";
 import type { PipelineSettings, RenderOptions, Tile } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 // Thumbnails are sized so exactly this many columns fill the panel width.
 // A grid this size or smaller fits without scrolling; anything larger keeps
@@ -27,13 +40,113 @@ interface Props {
   tiles: Tile[];
   settings: PipelineSettings;
   itemTextures: Map<string, ImageBitmap>;
+  /**
+   * Paint-along storage key (image hash + geometry), or null while the
+   * hash is being computed. Progress is tracked per key; see
+   * paint-progress.ts.
+   */
+  progressKey: string | null;
 }
 
-export function TileViewer({ tiles, settings, itemTextures }: Props) {
+export function TileViewer({
+  tiles,
+  settings,
+  itemTextures,
+  progressKey,
+}: Props) {
   const [selected, setSelected] = useState(0);
+  const [paintMode, setPaintMode] = useState(false);
+  // Ruler focus aid: crosshair per tile index, session-only. Kept per
+  // tile so switching maps doesn't lose your place on the previous one.
+  const [rulerMode, setRulerMode] = useState(false);
+  const [crosshairs, setCrosshairs] = useState<Map<number, Crosshair>>(
+    () => new Map(),
+  );
 
   const total = tiles.length;
   const tile = tiles[selected] ?? tiles[0];
+
+  const crosshair = crosshairs.get(selected) ?? null;
+  const setCrosshair = useCallback(
+    (next: Crosshair | null) => {
+      setCrosshairs((prev) => {
+        const map = new Map(prev);
+        if (next) map.set(selected, next);
+        else map.delete(selected);
+        return map;
+      });
+    },
+    [selected],
+  );
+
+  // The two interactive modes fight over pointer input; enabling one
+  // disables the other.
+  const togglePaint = () => {
+    setPaintMode((v) => {
+      if (!v) setRulerMode(false);
+      return !v;
+    });
+  };
+  const toggleRuler = () => {
+    setRulerMode((v) => {
+      if (!v) setPaintMode(false);
+      return !v;
+    });
+  };
+
+  // Paint-along progress: one bit per cell across the whole canvas.
+  const cellsPerTile = settings.tileSize * settings.tileSize;
+  const totalCells = total * cellsPerTile;
+  const progress = usePaintProgress(progressKey, totalCells, cellsPerTile);
+  const baseIndex = selected * cellsPerTile;
+  const tileDone = useMemo(
+    () => countBits(progress.bits, baseIndex, baseIndex + cellsPerTile),
+    [progress.bits, baseIndex, cellsPerTile],
+  );
+  // Per-tile completion for the thumbnails, recomputed only when bits
+  // change. Cheap relative to a render: one pass over the bitset.
+  const tileCompletion = useMemo(
+    () =>
+      tiles.map((_, i) =>
+        countBits(progress.bits, i * cellsPerTile, (i + 1) * cellsPerTile),
+      ),
+    [tiles, progress.bits, cellsPerTile],
+  );
+
+  // Arrow keys walk the ruler crosshair (Escape clears it). Bound to the
+  // document so it works without clicking the canvas first, but skipped
+  // while typing in inputs.
+  useEffect(() => {
+    if (!rulerMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || target?.isContentEditable)
+        return;
+      if (e.key === "Escape") {
+        setCrosshair(null);
+        return;
+      }
+      const deltas: Record<string, [number, number]> = {
+        ArrowLeft: [-1, 0],
+        ArrowRight: [1, 0],
+        ArrowUp: [0, -1],
+        ArrowDown: [0, 1],
+      };
+      const d = deltas[e.key];
+      if (!d) return;
+      e.preventDefault();
+      const max = settings.tileSize - 1;
+      const cur = crosshairs.get(selected);
+      const clamp = (v: number) => Math.min(max, Math.max(0, v));
+      // No crosshair yet: arrows start from the top-left cell.
+      const x = cur ? cur.x : 0;
+      const y = cur ? cur.y : 0;
+      setCrosshair({ x: clamp(x + d[0]), y: clamp(y + d[1]) });
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [rulerMode, crosshairs, selected, settings.tileSize, setCrosshair]);
 
   // Measure the panel so we can size thumbnails to fit THUMB_FIT_COLS across.
   // Locking that pixel size means bigger grids overflow and pan rather than
@@ -167,11 +280,117 @@ export function TileViewer({ tiles, settings, itemTextures }: Props) {
           </ul>
         </AlertDescription>
       </Alert>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant={paintMode ? "default" : "outline"}
+          size="sm"
+          onClick={togglePaint}
+          aria-pressed={paintMode}
+          title="Track which cells you've painted. Click or drag on the guide to mark them."
+        >
+          <Brush />
+          Paint-along
+        </Button>
+        <Button
+          type="button"
+          variant={rulerMode ? "default" : "outline"}
+          size="sm"
+          onClick={toggleRuler}
+          aria-pressed={rulerMode}
+          title="Highlight one row and column so you never lose your place. Click a cell to pin, arrow keys to move."
+        >
+          <Ruler />
+          Ruler
+        </Button>
+        {rulerMode && crosshair ? (
+          <Badge variant="outline" className="tabular-nums">
+            Cell {crosshair.x + 1}, {crosshair.y + 1}
+          </Badge>
+        ) : null}
+        {paintMode ? (
+          <>
+            <Badge variant="outline" className="tabular-nums">
+              This map: {tileDone}/{cellsPerTile} (
+              {Math.floor((tileDone / cellsPerTile) * 100)}%)
+            </Badge>
+            <Badge variant="outline" className="tabular-nums">
+              Total: {progress.done}/{totalCells} (
+              {Math.floor((progress.done / totalCells) * 100)}%)
+            </Badge>
+            <span className="flex-1" />
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={() => progress.setTile(selected, true)}
+              disabled={tileDone === cellsPerTile}
+              title="Mark every cell of this map as painted"
+            >
+              <Check />
+              Map done
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={() => progress.setTile(selected, false)}
+              disabled={tileDone === 0}
+              title="Clear this map's progress"
+            >
+              <Eraser />
+              Clear map
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={progress.reset}
+              disabled={progress.done === 0}
+              title="Wipe progress for the whole canvas"
+            >
+              <RotateCcw />
+              Reset all
+            </Button>
+          </>
+        ) : progress.done > 0 ? (
+          <Badge variant="outline" className="tabular-nums">
+            {Math.floor((progress.done / totalCells) * 100)}% painted
+          </Badge>
+        ) : null}
+      </div>
+      {paintMode ? (
+        <p className="text-muted-foreground text-xs">
+          Click or drag across cells you&apos;ve painted in-game. Progress is
+          saved in your browser per image and canvas size.
+          {progressKey === null
+            ? " (Still fingerprinting the image; marks made now won't persist.)"
+            : ""}
+        </p>
+      ) : null}
+      {rulerMode ? (
+        <p className="text-muted-foreground text-xs">
+          Click a cell to spotlight its row and column; everything else dims.
+          Use arrow keys to step, Escape or a second click to clear. Each map
+          remembers its own position.
+        </p>
+      ) : null}
       <div className="bg-background relative flex min-h-40 items-center justify-center overflow-auto rounded-md border p-4">
         {fullCanvas ? (
-          <CanvasView
-            source={fullCanvas}
-            className="h-auto max-w-full"
+          <PaintOverlay
+            guideCanvas={fullCanvas}
+            tileSize={settings.tileSize}
+            cellSize={settings.cellSize}
+            rulerMargin={settings.rulerMargin}
+            bits={progress.bits}
+            baseIndex={baseIndex}
+            paintMode={paintMode}
+            onPaintCell={(cellIndex, on) =>
+              progress.setCell(baseIndex + cellIndex, on)
+            }
+            rulerMode={rulerMode}
+            crosshair={rulerMode ? crosshair : null}
+            onCrosshairChange={setCrosshair}
             alt={`Tile ${tile.gx},${tile.gy}`}
           />
         ) : (
@@ -208,6 +427,7 @@ export function TileViewer({ tiles, settings, itemTextures }: Props) {
                   selected={i === selected}
                   onClick={() => setSelected(i)}
                   label={`${t.gx},${t.gy}`}
+                  doneRatio={tileCompletion[i]! / cellsPerTile}
                 />
               ) : (
                 <ThumbPlaceholder
@@ -236,19 +456,23 @@ function TileThumb({
   selected,
   onClick,
   label,
+  doneRatio,
 }: {
   canvas: AnyCanvas;
   selected: boolean;
   onClick: () => void;
   label: string;
+  /** 0..1 painted fraction; >= 1 marks the tile complete. */
+  doneRatio: number;
 }) {
+  const complete = doneRatio >= 1;
   return (
     <Button
       variant={selected ? "default" : "outline"}
       size="sm"
-      className="flex h-auto w-full flex-col gap-1 p-1.5"
+      className="relative flex h-auto w-full flex-col gap-1 p-1.5"
       onClick={onClick}
-      aria-label={`Tile ${label}`}
+      aria-label={`Tile ${label}${complete ? " (painted)" : ""}`}
     >
       <div className="aspect-square w-full overflow-hidden rounded-sm">
         <CanvasView
@@ -256,7 +480,19 @@ function TileThumb({
           className="block h-full w-full object-contain"
         />
       </div>
-      <span className="text-[10px] leading-none">{label}</span>
+      {complete ? (
+        <span className="absolute top-2 right-2 flex size-4 items-center justify-center rounded-full bg-emerald-500 text-white shadow">
+          <Check className="size-3" />
+        </span>
+      ) : null}
+      <span
+        className={cn(
+          "text-[10px] leading-none",
+          complete && "text-emerald-600 dark:text-emerald-400",
+        )}
+      >
+        {label}
+      </span>
     </Button>
   );
 }

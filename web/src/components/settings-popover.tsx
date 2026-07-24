@@ -6,7 +6,7 @@ import { ControlsPanel } from "@/components/controls-panel";
 import { GitHubStarButton } from "@/components/github-star-button";
 import { Button } from "@/components/ui/button";
 import { SupportButton } from "@/components/support-button";
-import type { PipelineSettings } from "@/lib/types";
+import type { Palette, PipelineSettings } from "@/lib/types";
 
 interface Props {
   open: boolean;
@@ -16,6 +16,8 @@ interface Props {
   onChange: (next: PipelineSettings) => void;
   onAspectAutoChange: (v: boolean) => void;
   onReset: () => void;
+  palette: Palette | null;
+  itemTextures: Map<string, ImageBitmap> | null;
 }
 
 const ENTER_MS = 180;
@@ -38,6 +40,8 @@ export function SettingsPopover(props: Props) {
     onChange,
     onAspectAutoChange,
     onReset,
+    palette,
+    itemTextures,
   } = props;
 
   // Two-state lifecycle: `mounted` keeps the DOM around through the exit
@@ -150,6 +154,8 @@ export function SettingsPopover(props: Props) {
             onChange={onChange}
             onAspectAutoChange={onAspectAutoChange}
             onReset={onReset}
+            palette={palette}
+            itemTextures={itemTextures}
           />
         </div>
       </div>

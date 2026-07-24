@@ -188,8 +188,11 @@ function javaArraysHashCode(bytes: Uint8Array): number {
  * 128x128 by 4x4 nearest-neighbor blocks" rule when reading the BLOB
  * back out, so the unfolded form we hash here is byte-for-byte the
  * same buffer ArtMap will reconstruct on the server side.
+ *
+ * Exported because the unfolded form is also exactly the `colors` array
+ * of a vanilla `map_N.dat` file (see vanilla-export.ts).
  */
-function tileToUnfoldedBytes(tile: Tile, tileSize: number): Uint8Array {
+export function tileToUnfoldedBytes(tile: Tile, tileSize: number): Uint8Array {
   if (tileSize !== 32) {
     throw new Error(
       `ArtMap export requires tileSize === 32 (got ${tileSize}); ArtMap stores 32x32 grids unfolded to 128x128.`,
