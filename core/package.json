@@ -20,11 +20,11 @@
     "clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('dist', { recursive: true, force: true }))\""
   },
   "dependencies": {
-    "pako": "^2.1.0"
+    "pako": "^3.0.1"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
-    "@types/pako": "^2.0.3",
+    "@types/pako": "^3.0.0",
     "typescript": "^6"
   }
 }
